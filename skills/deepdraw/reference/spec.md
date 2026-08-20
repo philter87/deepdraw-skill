@@ -1,6 +1,6 @@
 # The spec
 
-What `scripts/build_html.py` reads. It is DeepDraw's model written as a tree
+What `$SKILL/scripts/build_html.py` reads. It is DeepDraw's model written as a tree
 with the defaults left out; the builder fills them in and emits the canonical
 document (`document-format.md`).
 

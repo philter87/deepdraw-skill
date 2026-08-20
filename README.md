@@ -53,10 +53,19 @@ Per repository instead: `.agents/skills/deepdraw/`.
 
 ## Use
 
-Ask in plain language — *"map this service out in DeepDraw"*, *"draw the deploy
-pipeline"* — or invoke it directly: `/deepdraw` in Claude Code, `$deepdraw` in
-Codex. The agent plans the hierarchy, writes a spec, builds it, and hands back
-the `.html`.
+Trigger it deliberately, with the subject after the command:
+
+```
+/deepdraw the checkout service and how it talks to payments
+```
+
+`/deepdraw` in Claude Code, `$deepdraw` in Codex, `/deepdraw` in Copilot. The
+agent plans the hierarchy, writes a spec, builds it, and hands back the `.html`.
+
+The skill sets `disable-model-invocation: true`, so in Claude Code it never
+fires on its own — asking for "a diagram" gets you a diagram some other way
+until you type the command. Copilot and Codex ignore that field and may still
+pick the skill up from its description.
 
 Nothing to install beyond Python 3: the scripts have no dependencies.
 

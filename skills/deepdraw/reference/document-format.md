@@ -94,7 +94,7 @@ them apart by their bytes, not by their extension.
 
 ## The HTML file
 
-`reference/template.html` is DeepDraw's own HTML export with two placeholders:
+`$SKILL/reference/template.html` is DeepDraw's own HTML export with two placeholders:
 
 ```
 __DEEPDRAW_TITLE__           in <title>, HTML-escaped
@@ -110,10 +110,21 @@ icon's inline SVG closes the script tag early and takes the document with it.
 `build_html.py` does that; `\u003c` is ordinary JSON escaping, so what comes
 back out parses unchanged.
 
-To recover the document from a file, match:
+## Editing a drawing that already exists
 
-```
-<script id="dd-document" type="application/json">(.*?)</script>
+`build_html.py` takes a canonical document as well as a spec, so an existing
+drawing is edited rather than redrawn — node ids survive and the change is a
+diff. Use the `.deepdraw.json` beside the file, or pull the document out of the
+`.html` itself:
+
+```bash
+python3 - <<'EOF'
+import re, json, pathlib
+html = pathlib.Path('drawing.html').read_text()
+doc = re.search(r'<script id="dd-document" type="application/json">(.*?)</script>', html, re.S).group(1)
+pathlib.Path('drawing.deepdraw.json').write_text(json.dumps(json.loads(doc), indent=2))
+EOF
 ```
 
-which is what both DeepDraw's browser reader and its server do.
+That regex is the whole reader: DeepDraw uses it in the browser, and again on
+the server when a file is imported.

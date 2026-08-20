@@ -2,7 +2,7 @@
 
 DeepDraw's icon picker searches the public **Iconify** API and stores what comes
 back — raw `<svg>` markup — in the node's `href`. Nothing is fetched at render
-time, so an exported drawing keeps its icons offline. `scripts/iconify.py` calls
+time, so an exported drawing keeps its icons offline. `$SKILL/scripts/iconify.py` calls
 the same two endpoints.
 
 ## Finding one

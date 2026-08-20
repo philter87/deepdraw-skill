@@ -56,6 +56,11 @@ conversation, and ask when it is not obvious.
   that. The builder warns when an arrow crosses drawings.
 - **Notes are where the words go.** Anything longer than a two-word label
   belongs in `notes` (markdown), not in a bigger box.
+- **The pencil is for annotation.** A `draw` node is a freehand stroke through
+  `points` — flat `x, y, x, y…` normalised to its own box, so
+  `[0, 0.5, 1, 0.5]` is a line straight across the middle. Ring or underline
+  something that is already on the page with it; do not draw shapes the other
+  types give you for free.
 
 ## Reference
 

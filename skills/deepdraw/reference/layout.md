@@ -42,6 +42,8 @@ there. Two things follow:
 
 - Break long labels yourself, and keep them to 2–3 lines. Anything longer is
   `notes`, not a label.
+- A label is **plain text**, not markup: write `<img>`, not `&lt;img&gt;`, or
+  the entity appears on screen exactly as typed.
 - Size the box to the **longest line**: roughly `fontSize × 0.58` per character,
   plus 24 units of breathing room. At `fontSize: 14`, "Checkout API" wants about
   120 units, so a 180-wide box is comfortable.
@@ -78,8 +80,10 @@ wrong. Some patterns that work:
   `children`; grouping visually is a container. They are different tools and
   they compose.
 - **Notes carry the prose.** A shape's `notes` is markdown, shown beside the
-  drawing when the shape is selected, and `@Some label` in it references another
-  shape by name. Put the paragraph there and keep the label to two words.
+  drawing when the shape is selected, and `@[Some label]` in it links to another
+  shape. Put the paragraph there and keep the label to two words. The link only
+  resolves if the label matches that shape's **entire** `text`, so only
+  single-line labels can be mentioned — see *Mentions in notes* in `spec.md`.
 - **A shape with content is marked.** DeepDraw draws small badges in a shape's
   bottom-right corner when it has notes or a nested drawing, so a reader can see
   where the depth is without hunting. You get that for free by filling them in.

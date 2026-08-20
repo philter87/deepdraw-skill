@@ -37,7 +37,7 @@ document (`document-format.md`).
 | `type` | `"rect"` | See **Types** below |
 | `x`, `y` | `0` | Top-left corner, in this drawing's own coordinates |
 | `w`, `h` | per type | Size in document units |
-| `text` | `""` | The label drawn on the shape. **Never wraps** — use `\n` |
+| `text` | `""` | The label drawn on the shape. **Plain text, never wraps** — use `\n` |
 | `notes` (or `markdown`) | `""` | Markdown shown in the notes pane when the shape is selected |
 | `style` | per type | Any subset of the style fields; the rest come from the type |
 | `rotation` | `0` | Degrees clockwise about the shape's centre |
@@ -116,6 +116,39 @@ position, size and — optionally — its own `text` and `style` here.
 
 Use one to draw an arrow at something that lives in another drawing, or to show
 one component in several places without duplicating it.
+
+## Labels are plain text
+
+`text` is drawn as characters, not parsed as markup. Write the angle brackets
+you want to see:
+
+```jsonc
+"text": "<img> arrives"      // correct
+"text": "&lt;img&gt; arrives"   // renders the entities literally
+```
+
+Notes are the opposite — they are markdown, so wrap tag names in backticks
+(`` `<img>` ``) to keep the renderer from eating them.
+
+## Mentions in notes
+
+`@[Some label]` in a `notes` string becomes a chip that navigates to the node
+with that label. Two rules decide whether it actually resolves, and both are
+easy to get wrong because a dead mention still *renders* as a chip:
+
+- **Use the bracket form for anything but one bare word.** Unbracketed, `@`
+  captures a single `[\w][\w.-]*` token, so `@Order state` links "Order" and
+  leaves " state" as text.
+- **The label must equal the target's whole `text`, exactly** (case-insensitive,
+  trimmed). So **a node whose label contains `\n` can never be mentioned** — the
+  bracket form cannot contain a newline. Note the trap: the hierarchy tree and
+  breadcrumb show only the *first line*, so a shape labelled
+  `"The wire\nHTTP/0.9 → HTTP/3"` is listed as "The wire", and `@[The wire]`
+  still fails.
+
+If you want a shape to be mentionable, give it a single-line label and move the
+second line into its `notes`. `--check` reports mentions that resolve to
+nothing.
 
 ## Building
 

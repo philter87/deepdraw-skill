@@ -56,6 +56,13 @@ conversation, and ask when it is not obvious.
   that. The builder warns when an arrow crosses drawings.
 - **Notes are where the words go.** Anything longer than a two-word label
   belongs in `notes` (markdown), not in a bigger box.
+- **Labels are plain text; notes are markdown.** Write `<img>` in a label, not
+  `&lt;img&gt;` — entities render literally. In notes it is the reverse: put
+  tag names in backticks so markdown leaves them alone.
+- **A `@[mention]` needs the target's whole label.** Bracket it unless it is one
+  bare word, and only single-line labels can be linked — the match is against
+  the entire `text`, newline included, even though the tree shows only the first
+  line. The builder warns about mentions that resolve to nothing.
 - **The pencil is for annotation.** A `draw` node is a freehand stroke through
   `points` — flat `x, y, x, y…` normalised to its own box, so
   `[0, 0.5, 1, 0.5]` is a line straight across the middle. Ring or underline

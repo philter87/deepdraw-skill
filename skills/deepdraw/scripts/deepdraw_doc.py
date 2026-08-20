@@ -12,6 +12,7 @@ dictionaries, so it can be imported and unit-tested on its own.
 from __future__ import annotations
 
 import random
+import re
 import string
 from typing import Any
 
@@ -393,6 +394,57 @@ def canvas_bounds(doc: dict[str, Any], drawing_id: str) -> dict[str, float]:
 # --- validation --------------------------------------------------------------
 
 
+# Mirrors the viewer: @[any label here] or a single bare @token. JS `\w` is
+# ASCII, so spell the classes out rather than using Python's Unicode \w.
+_MENTION_RE = re.compile(r"@(?:\[([^\]\n]{1,60})\]|([A-Za-z0-9_][A-Za-z0-9_.-]{0,59}))")
+_FENCED_RE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
+_INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+
+def _mention_warnings(doc: dict[str, Any]) -> list[str]:
+    """A mention still renders as a chip when it matches nothing, so flag those.
+
+    The viewer resolves one by comparing the label against a node's *entire*
+    `text`, case-insensitively — which is why a multi-line label can never be
+    reached, even though the tree lists it by its first line.
+    """
+    nodes = doc["nodes"]
+    root_id = doc["rootId"]
+
+    labels: set[str] = set()
+    for node_id, node in nodes.items():
+        if node_id == root_id:
+            continue
+        text = node.get("text")
+        if text is None and node.get("kind") == "link":
+            target = nodes.get(node.get("targetId")) or {}
+            text = target.get("text")
+        if text and text.strip():
+            labels.add(text.strip().lower())
+
+    # First lines of multi-line labels: the shapes the tree makes look mentionable.
+    first_line = {t.split("\n", 1)[0].strip(): t for t in labels if "\n" in t}
+
+    warnings: list[str] = []
+    for node_id, node in nodes.items():
+        notes = node.get("markdown") or ""
+        if "@" not in notes:
+            continue
+        # The viewer skips mentions inside code spans and fences; so do we.
+        scannable = _INLINE_CODE_RE.sub(" ", _FENCED_RE.sub(" ", notes))
+        for match in _MENTION_RE.finditer(scannable):
+            label = (match.group(1) or match.group(2) or "").strip()
+            if not label or label.lower() in labels:
+                continue
+            hint = ""
+            if label.lower() in first_line:
+                hint = " — that shape's label has a second line, so it cannot be mentioned"
+            elif match.group(2):
+                hint = " — bracket it as @[…] if the label is more than one word"
+            warnings.append(f"{node_id!r}: notes mention @{label} but no shape has that label{hint}")
+    return warnings
+
+
 def validate(doc: dict[str, Any]) -> list[str]:
     """Raises SpecError on anything that would not render; returns warnings."""
     nodes = doc["nodes"]
@@ -468,6 +520,8 @@ def validate(doc: dict[str, Any]) -> list[str]:
                 problems.append(f"{node_id!r}: `points` needs an even count of at least 4")
         if node_type in ("image", "icon") and not node.get("href"):
             warnings.append(f"{node_id!r}: {node_type} has no `href`, so it draws as a placeholder")
+
+    warnings.extend(_mention_warnings(doc))
 
     # A cycle would make the tree infinite; the renderer walks it by parentId.
     for node_id in nodes:

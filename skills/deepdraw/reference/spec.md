@@ -120,10 +120,10 @@ one component in several places without duplicating it.
 ## Building
 
 ```bash
-python3 scripts/build_html.py spec.json -o out.html   # the drawing
-python3 scripts/build_html.py spec.json --check       # validate only
-python3 scripts/build_html.py spec.json --json        # also write the canonical JSON
-python3 scripts/build_html.py spec.json --seed 7      # reproducible generated ids
+python3 "$SKILL/scripts/build_html.py" spec.json -o out.html   # the drawing
+python3 "$SKILL/scripts/build_html.py" spec.json --check       # validate only
+python3 "$SKILL/scripts/build_html.py" spec.json --json        # also write the canonical JSON
+python3 "$SKILL/scripts/build_html.py" spec.json --seed 7      # reproducible generated ids
 ```
 
 Errors stop the build (an arrow pointing at nothing, a missing style field, a

@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
 *.html
-!deepdraw/reference/template.html
+!skills/deepdraw/reference/template.html
 *.deepdraw.json
 .DS_Store

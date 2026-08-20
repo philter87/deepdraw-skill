@@ -1,0 +1,12 @@
+{
+  "name": "deepdraw-skill",
+  "owner": { "name": "philter87", "url": "https://github.com/philter87" },
+  "description": "The DeepDraw drawing skill.",
+  "plugins": [
+    {
+      "name": "deepdraw",
+      "source": "./",
+      "description": "Draw for DeepDraw (deepdraw.ai): author a hierarchical diagram as JSON and build the interactive standalone HTML the app exports and imports."
+    }
+  ]
+}

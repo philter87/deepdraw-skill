@@ -14,6 +14,10 @@ You author a **spec** (JSON), run one script, and hand back a single `.html`
 file. That file opens in any browser on its own, and imports into deepdraw.ai
 through **☰ → Import…** unchanged.
 
+Paths below are written against `$SKILL`, the directory this file is in — in
+Claude Code that is `${CLAUDE_SKILL_DIR}`; elsewhere it is wherever you found
+`SKILL.md`.
+
 ## Workflow
 
 1. **Plan the hierarchy first.** What are the 4–8 shapes on the top level, and
@@ -21,12 +25,12 @@ through **☰ → Import…** unchanged.
    normal. See `reference/layout.md`.
 2. **Write the spec** to a `.json` file — a tree of shapes, `children` for
    nested drawings, defaults omitted. Full grammar: `reference/spec.md`.
-3. **Icons, if the drawing wants them:** `scripts/iconify.py search <query>`
-   then `scripts/iconify.py get <name> --node`. See `reference/icons.md`.
+3. **Icons, if the drawing wants them:** `$SKILL/scripts/iconify.py search
+   <query>` then `… get <name> --node`. See `reference/icons.md`.
 4. **Build:**
 
    ```bash
-   python3 scripts/build_html.py drawing.json -o drawing.html --json
+   python3 "$SKILL/scripts/build_html.py" drawing.json -o drawing.html --json
    ```
 
    It validates first and refuses to write a drawing that would not render. Fix

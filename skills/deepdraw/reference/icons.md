@@ -8,9 +8,9 @@ the same two endpoints.
 ## Finding one
 
 ```bash
-python3 scripts/iconify.py search database
-python3 scripts/iconify.py search "message queue" --limit 40
-python3 scripts/iconify.py search server --sets material-symbols,lucide
+python3 "$SKILL/scripts/iconify.py" search database
+python3 "$SKILL/scripts/iconify.py" search "message queue" --limit 40
+python3 "$SKILL/scripts/iconify.py" search server --sets material-symbols,lucide
 ```
 
 Names are `prefix:name` — `material-symbols:database`, `lucide:server`,
@@ -28,7 +28,7 @@ in one diagram looks like an accident. Good defaults:
 ## Putting it in the drawing
 
 ```bash
-python3 scripts/iconify.py get material-symbols:database --node --label "Postgres"
+python3 "$SKILL/scripts/iconify.py" get material-symbols:database --node --label "Postgres"
 ```
 
 prints a spec node ready to paste:

@@ -3,7 +3,7 @@
 The canonical document is what DeepDraw itself exports (see
 `reference/document-format.md`): a flat `nodes` map keyed by id, with every
 node carrying a *complete* `style` object. The spec this module accepts is the
-same model written as a tree, with defaults left out — see `reference/spec.md`.
+same model written as a tree, with defaults left out. See `reference/spec.md`.
 
 Nothing here talks to the network or to the browser; it is arithmetic on
 dictionaries, so it can be imported and unit-tested on its own.
@@ -104,6 +104,86 @@ def style_for(node_type: str, overrides: dict[str, Any] | None = None) -> dict[s
     return style
 
 
+# --- document -> a smaller file ----------------------------------------------
+
+
+def compact(doc: dict[str, Any]) -> dict[str, Any]:
+    """The same document with everything DeepDraw already assumes left out.
+
+    DeepDraw's reader fills defaults in on the way back (``normalizeDocument``
+    in the library, ``DocumentDefaults`` on the server, and the boot script of
+    the standalone page), so a file does not have to spell out eleven style
+    properties per shape that are already the type's own. It is the same
+    document, written the way a person would write it: what changed, and
+    nothing else.
+
+    Only what the reader is guaranteed to reconstruct is dropped:
+
+    - ``kind`` when it is ``shape``, ``type`` when it is ``rect``.
+    - ``x``/``y`` at 0, ``rotation`` at 0, ``text``/``markdown`` empty.
+    - ``w``/``h`` when they equal the type's default size.
+    - Style properties equal to the type's default, and ``style`` itself when
+      that leaves it empty.
+    - ``parentId`` when it is the root, since a parentless node is top level.
+
+    ``index`` and ``id`` stay. Order among siblings is what ``index`` carries,
+    and a reader falling back on declaration order would put it at the mercy of
+    how some JSON library happened to sort the keys.
+    """
+    nodes: dict[str, Any] = {}
+    for node_id, node in doc["nodes"].items():
+        nodes[node_id] = _whole_numbers(_compact_node(node, doc["rootId"]))
+    return {**doc, "nodes": nodes}
+
+
+def _whole_numbers(value: Any) -> Any:
+    """`760.0` written as `760`. The arithmetic here is in floats; the file is
+    read by people, and a coordinate with a pointless `.0` on it is noise."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, dict):
+        return {k: _whole_numbers(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_whole_numbers(v) for v in value]
+    return value
+
+
+def _compact_node(node: dict[str, Any], root_id: str) -> dict[str, Any]:
+    out = {k: v for k, v in node.items() if k not in ("style", "kind")}
+    if node.get("kind") == "link":
+        out["kind"] = "link"
+        style = {k: v for k, v in (node.get("style") or {}).items()}
+        if style:
+            out["style"] = style
+        return out
+
+    node_type = node.get("type", "rect")
+    default_w, default_h = DEFAULT_SIZE.get(node_type, FALLBACK_SIZE)
+    defaults = {
+        "type": "rect",
+        "x": 0,
+        "y": 0,
+        "w": default_w,
+        "h": default_h,
+        "rotation": 0,
+        "text": "",
+        "markdown": "",
+        "groupId": None,
+        "parentId": root_id,
+    }
+    for field, default in defaults.items():
+        if field in out and out[field] == default:
+            del out[field]
+
+    reference = style_for(node_type)
+    style = {k: v for k, v in (node.get("style") or {}).items() if reference.get(k) != v}
+    if style:
+        out["style"] = style
+    return out
+
+
 # --- spec -> document --------------------------------------------------------
 
 
@@ -111,8 +191,8 @@ def build_document(spec: dict[str, Any], seed: int | None = None) -> dict[str, A
     """The canonical document for `spec`.
 
     A spec that is already a canonical document (a `nodes` *mapping* plus a
-    `rootId`) is normalised in place instead — missing styles are filled in,
-    everything else is left alone — so a document exported from DeepDraw can be
+    `rootId`) is normalised in place instead: missing styles are filled in and
+    everything else is left alone, so a document exported from DeepDraw can be
     edited and fed straight back in.
     """
     if isinstance(spec.get("nodes"), dict) and spec.get("rootId"):
@@ -121,25 +201,60 @@ def build_document(spec: dict[str, Any], seed: int | None = None) -> dict[str, A
 
 
 def _normalise_document(doc: dict[str, Any]) -> dict[str, Any]:
+    """A whole document out of one that may be missing most of itself.
+
+    This is the reading half of :func:`compact`, and it mirrors
+    ``normalizeDocument`` in DeepDraw's own library: what a file leaves out, the
+    reader puts back. So an exported drawing, a compacted one, and a document
+    somebody hand-edited down to the parts they cared about all arrive here as
+    the same thing.
+    """
+    root_id = doc["rootId"]
     out = {
         "version": doc.get("version", DOC_VERSION),
         "id": doc.get("id") or nanoid(),
         "title": doc.get("title") or "Untitled drawing",
-        "rootId": doc["rootId"],
+        "rootId": root_id,
         "nodes": {},
     }
-    for node_id, node in doc["nodes"].items():
+    for ordinal, (node_id, node) in enumerate(doc["nodes"].items()):
         node = dict(node)
         node["id"] = node_id
-        if node.get("kind") != "link":
-            node.setdefault("kind", "shape")
-            node.setdefault("type", "rect")
+        is_link = node.get("kind") == "link" or "targetId" in node
+        node_type = "root" if node_id == root_id else node.get("type", "rect")
+        if is_link:
+            node["kind"] = "link"
+        else:
+            node["kind"] = "shape"
+            node["type"] = node_type
             node.setdefault("text", "")
             node.setdefault("markdown", "")
-            node["style"] = style_for(node["type"], node.get("style"))
-        for field, default in (("x", 0), ("y", 0), ("w", 0), ("h", 0), ("rotation", 0), ("index", 0)):
+            node["style"] = style_for(node_type, node.get("style"))
+            # A bare node name is what somebody writing an arrow by hand means.
+            if node_type == "arrow":
+                for which in ("from", "to"):
+                    if isinstance(node.get(which), str):
+                        node[which] = {"nodeId": node[which]}
+
+        default_w, default_h = DEFAULT_SIZE.get("rect" if is_link else node_type, FALLBACK_SIZE)
+        for field, default in (
+            ("x", 0), ("y", 0), ("w", default_w), ("h", default_h),
+            ("rotation", 0), ("index", ordinal),
+        ):
             node.setdefault(field, default)
+        # A missing parent, or one naming nothing, is the top level.
+        if node_id == root_id:
+            node["parentId"] = None
+        elif node.get("parentId") not in doc["nodes"]:
+            node["parentId"] = root_id
         out["nodes"][node_id] = node
+
+    out["nodes"].setdefault(root_id, {
+        "kind": "shape", "id": root_id, "parentId": None, "index": 0,
+        "x": 0, "y": 0, "w": 0, "h": 0, "rotation": 0,
+        "type": "root", "text": "", "markdown": "", "style": style_for("root"),
+    })
+    _resolve_arrow_bounds(out)
     validate(out)
     return out
 
@@ -159,14 +274,17 @@ def _from_tree(spec: dict[str, Any], seed: int | None) -> dict[str, Any]:
             "rotation": 0,
             "type": "root",
             "text": "",
-            "markdown": "",
+            # The drawing's own notes. They are what a reader sees the moment
+            # the file opens, before anything is selected, so a drawing without
+            # them starts on an empty panel and an unexplained picture.
+            "markdown": spec.get("notes") or spec.get("markdown") or "",
             "style": style_for("root"),
         }
     }
 
     children = spec.get("shapes") or spec.get("nodes") or []
     if isinstance(children, dict):
-        raise SpecError("a `nodes` mapping is a canonical document — it needs a `rootId` too")
+        raise SpecError("a `nodes` mapping is a canonical document: it needs a `rootId` too")
     if not isinstance(children, list):
         raise SpecError("`shapes` must be a list of nodes")
 
@@ -405,7 +523,7 @@ def _mention_warnings(doc: dict[str, Any]) -> list[str]:
     """A mention still renders as a chip when it matches nothing, so flag those.
 
     The viewer resolves one by comparing the label against a node's *entire*
-    `text`, case-insensitively — which is why a multi-line label can never be
+    `text`, case-insensitively, which is why a multi-line label can never be
     reached, even though the tree lists it by its first line.
     """
     nodes = doc["nodes"]
@@ -438,9 +556,9 @@ def _mention_warnings(doc: dict[str, Any]) -> list[str]:
                 continue
             hint = ""
             if label.lower() in first_line:
-                hint = " — that shape's label has a second line, so it cannot be mentioned"
+                hint = ": that shape's label has a second line, so it cannot be mentioned"
             elif match.group(2):
-                hint = " — bracket it as @[…] if the label is more than one word"
+                hint = ": bracket it as @[…] if the label is more than one word"
             warnings.append(f"{node_id!r}: notes mention @{label} but no shape has that label{hint}")
     return warnings
 
@@ -510,7 +628,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
                     # Coordinates only mean something within one drawing, so an
                     # arrow reaching into another one lands somewhere arbitrary.
                     warnings.append(
-                        f"{node_id!r}: `{which}` is in another drawing — "
+                        f"{node_id!r}: `{which}` is in another drawing, so "
                         f"put a link node in {parent!r} and point at that instead"
                     )
 
@@ -520,6 +638,16 @@ def validate(doc: dict[str, Any]) -> list[str]:
                 problems.append(f"{node_id!r}: `points` needs an even count of at least 4")
         if node_type in ("image", "icon") and not node.get("href"):
             warnings.append(f"{node_id!r}: {node_type} has no `href`, so it draws as a placeholder")
+
+    # The drawing's own notes are the first thing a reader sees: the panel is
+    # open before anything is selected, so a drawing without them opens on an
+    # empty panel beside a picture nobody has introduced.
+    root = nodes[root_id]
+    if not (root.get("markdown") or "").strip():
+        warnings.append(
+            "the drawing has no notes of its own: put a `notes` string at the top "
+            "level of the spec saying what this is and where to look first"
+        )
 
     warnings.extend(_mention_warnings(doc))
 

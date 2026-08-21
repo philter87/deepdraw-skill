@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from deepdraw_doc import SpecError, build_document, canvas_bounds, validate  # noqa: E402
+from deepdraw_doc import SpecError, build_document, canvas_bounds, compact, validate  # noqa: E402
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "reference" / "template.html"
 TITLE_MARK = "__DEEPDRAW_TITLE__"
@@ -67,7 +67,7 @@ def main() -> int:
     try:
         spec = json.loads(spec_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        print(f"{spec_path}: not valid JSON — {error}", file=sys.stderr)
+        print(f"{spec_path}: not valid JSON. {error}", file=sys.stderr)
         return 1
 
     try:
@@ -90,13 +90,18 @@ def main() -> int:
     if args.check:
         return 0
 
+    # Validated whole, written small: DeepDraw fills its own defaults back in
+    # (`compact`), so the file says what changed and nothing else, which is
+    # also what makes the JSON beside it something a person can read and edit.
+    small = compact(document)
+
     out = Path(args.out) if args.out else spec_path.with_suffix(".html")
-    out.write_text(to_standalone_html(document), encoding="utf-8")
+    out.write_text(to_standalone_html(small), encoding="utf-8")
     print(f"wrote {out} ({out.stat().st_size // 1024} KB)")
 
     if args.json_out:
         json_out = out.with_suffix(".deepdraw.json") if args.json_out is True else Path(args.json_out)
-        json_out.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+        json_out.write_text(json.dumps(small, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"wrote {json_out}")
     return 0
 

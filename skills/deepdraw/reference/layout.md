@@ -12,7 +12,7 @@ Three consequences worth building on:
 - **Coordinates are relative.** Only the ratios between your numbers matter.
   Everything below is a scale, not a size.
 - **A small drawing is a zoomed-in drawing.** Four boxes across 400 units fill
-  the screen just as four boxes across 1200 units do — but at 3× the apparent
+  the screen just as four boxes across 1200 units do, but at 3× the apparent
   font size. So `fontSize: 14` means something only next to the drawing's own
   extent.
 - **Keep every level to the same scale.** Lay each drawing out around
@@ -22,7 +22,7 @@ Three consequences worth building on:
   them.
 
 `x`/`y` are the **top-left corner**. Y grows downward. Negative coordinates are
-fine — a drawing is framed by what it holds, not by an origin.
+fine: a drawing is framed by what it holds, not by an origin.
 
 ## Numbers that work
 
@@ -48,7 +48,7 @@ there. Two things follow:
   plus 24 units of breathing room. At `fontSize: 14`, "Checkout API" wants about
   120 units, so a 180-wide box is comfortable.
 
-`vAlign: "above"` and `"below"` draw the label *outside* the shape — that is
+`vAlign: "above"` and `"below"` draw the label *outside* the shape, which is
 how `icon` and `image` are captioned by default. `container` puts its label at
 the top, out of the way of what is inside it.
 
@@ -76,21 +76,21 @@ wrong. Some patterns that work:
 - **System → service → internals.** The top level is the 5–8 boxes someone
   should remember; each one contains how it is actually built.
 - **A `container` is not a parent.** It draws a dashed region around shapes that
-  are its *siblings* — a zone, an environment, a team boundary. Nesting is
+  are its *siblings*: a zone, an environment, a team boundary. Nesting is
   `children`; grouping visually is a container. They are different tools and
   they compose.
 - **Notes carry the prose.** A shape's `notes` is markdown, shown beside the
   drawing when the shape is selected, and `@[Some label]` in it links to another
   shape. Put the paragraph there and keep the label to two words. The link only
   resolves if the label matches that shape's **entire** `text`, so only
-  single-line labels can be mentioned — see *Mentions in notes* in `spec.md`.
+  single-line labels can be mentioned. See *Mentions in notes* in `spec.md`.
 - **A shape with content is marked.** DeepDraw draws small badges in a shape's
   bottom-right corner when it has notes or a nested drawing, so a reader can see
   where the depth is without hunting. You get that for free by filling them in.
 
 ## Colour
 
-The default palette — white fill, slate stroke `#334155`, near-black text — is
+The default palette (white fill, slate stroke `#334155`, near-black text) is
 deliberate and safe. When you tint, keep to **light fills with a matching darker
 stroke**:
 
@@ -104,8 +104,31 @@ stroke**:
 | Slate | `#f8fafc` | `#475569` |
 
 Two reasons to stay in that shape. Colour should carry one distinction (kind of
-component, or ownership) and go on being readable — dark fills fight the label.
+component, or ownership) and go on being readable; dark fills fight the label.
 And DeepDraw's dark theme **inverts the drawing surface** rather than repainting
 it: lightness flips, hue is kept. A light-blue box with a dark-blue edge becomes
 a dark-blue box with a light-blue edge and reads correctly. A box already dark
 comes out glaring.
+
+**Use it, though.** Pick the one distinction the colours carry, tint every box
+accordingly, and say what the colours mean in the drawing's own notes. An
+all-white drawing looks like nobody decided anything; a rainbow looks the same,
+for the opposite reason. Three or four colours on a level is usually right, and
+an `icon` tinted with `textColor` to match the boxes around it ties the two
+together.
+
+## Two things that stop a drawing looking generated
+
+- **Icons.** An `icon` node is a picture where a picture says it faster: a
+  database, a queue, a lock, a browser, a robot, a brand mark. Caption it with
+  `text` (drawn below by default) and tint the glyph with `style.textColor`.
+  See `icons.md`. Two or three per level, beside the boxes rather than instead
+  of them.
+- **The pencil.** A `draw` node is a freehand stroke, and it reads as a human
+  hand on top of a machine-drawn picture. Ring the step under discussion,
+  underline the hot path, cross out what is being retired, put a wavy line
+  under a number nobody believes. `points` are `x, y, x, y…` normalised to the
+  node's own box, so a stroke is positioned and sized like any other shape:
+  `[0, 0.5, 1, 0.5]` is a line straight across the middle, and a dozen points
+  around the edge is a hand-drawn ring. Give it a `stroke` that stands out from
+  the palette and a `strokeWidth` of 3.

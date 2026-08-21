@@ -2,7 +2,7 @@
 """Find icons on the public Iconify API, in the form a DeepDraw node wants.
 
 DeepDraw's own icon picker calls the same two endpoints, and stores what comes
-back verbatim in the node's `href` — raw `<svg>` markup, not a URL — so an
+back verbatim in the node's `href` as raw `<svg>` markup, not a URL, so an
 exported drawing keeps its icons with no network behind it.
 
     python3 iconify.py search database            # names, one per line

@@ -1,14 +1,16 @@
 {
   "title": "Checkout service",
+  "notes": "# Checkout service\n\nHow a basket becomes money in the bank, and who touches it on the way.\n\nStart at @[Web app] and follow the arrows right. **A box with a corner badge holds a drawing of its own.** Click it twice to look inside, and click the breadcrumb to come back.\n\n| Colour | What it is |\n|---|---|\n| Blue | Something a customer touches |\n| Green | A service we own |\n| Amber | State we keep |\n| Violet | Somebody else's API |\n",
   "shapes": [
     {
       "id": "edge",
       "type": "container",
       "x": 0,
       "y": 0,
-      "w": 760,
-      "h": 260,
+      "w": 780,
+      "h": 280,
       "text": "Edge",
+      "notes": "Everything in here is deployed to the CDN edge, close to the customer.",
       "style": {
         "stroke": "#94a3b8"
       }
@@ -17,33 +19,69 @@
       "id": "web",
       "type": "rect",
       "x": 40,
-      "y": 60,
-      "w": 180,
-      "h": 90,
+      "y": 70,
+      "w": 190,
+      "h": 100,
       "text": "Web app",
       "style": {
         "fill": "#eff6ff",
         "stroke": "#2563eb"
       },
-      "notes": "# Web app\n\nNext.js, served from the edge.\n\n- SSR for the catalogue\n- Client-side cart",
+      "notes": "# Web app\n\nNext.js, served from the edge.\n\n- SSR for the catalogue\n- Client-side cart\n\nInside: the two screens that matter.",
       "children": [
         {
           "id": "web-cart",
           "type": "rect",
-          "x": 40,
-          "y": 60,
-          "w": 180,
-          "h": 90,
-          "text": "Cart"
+          "x": 60,
+          "y": 80,
+          "w": 200,
+          "h": 100,
+          "text": "Cart",
+          "style": {
+            "fill": "#eff6ff",
+            "stroke": "#2563eb"
+          },
+          "notes": "Held in local storage until sign-in, then merged server-side."
+        },
+        {
+          "id": "web-cart-icon",
+          "type": "icon",
+          "x": 130,
+          "y": 210,
+          "w": 56,
+          "h": 56,
+          "text": "basket",
+          "style": {
+            "textColor": "#2563eb"
+          },
+          "href": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M5.588 21.413Q5 20.825 5 20t.588-1.412T7 18t1.413.588T9 20t-.587 1.413T7 22t-1.412-.587m10 0Q15 20.825 15 20t.588-1.412T17 18t1.413.588T19 20t-.587 1.413T17 22t-1.412-.587M5.2 4h14.75q.575 0 .875.513t.025 1.037l-3.55 6.4q-.275.5-.737.775T15.55 13H8.1L7 15h12v2H7q-1.125 0-1.7-.987t-.05-1.963L6.6 11.6L3 4H1V2h3.25z\"/></svg>"
         },
         {
           "id": "web-pay",
           "type": "rect",
-          "x": 300,
-          "y": 60,
-          "w": 180,
-          "h": 90,
-          "text": "Pay sheet"
+          "x": 400,
+          "y": 80,
+          "w": 200,
+          "h": 100,
+          "text": "Pay sheet",
+          "style": {
+            "fill": "#eff6ff",
+            "stroke": "#2563eb"
+          },
+          "notes": "Hosted fields from the PSP: card numbers never reach our origin."
+        },
+        {
+          "id": "web-pay-icon",
+          "type": "icon",
+          "x": 472,
+          "y": 210,
+          "w": 56,
+          "h": 56,
+          "text": "card",
+          "style": {
+            "textColor": "#2563eb"
+          },
+          "href": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M4 20q-.825 0-1.412-.587T2 18V6q0-.825.588-1.412T4 4h16q.825 0 1.413.588T22 6v12q0 .825-.587 1.413T20 20zm0-8h16V8H4z\"/></svg>"
         },
         {
           "id": "web-flow",
@@ -52,7 +90,8 @@
           "to": "web-pay",
           "fromSide": "right",
           "toSide": "left",
-          "text": "checkout"
+          "text": "checkout",
+          "notes": "One step, and the whole funnel hangs off it: **31% drop out here**.\n\nThe cart is posted, the sheet is mounted, nothing is charged yet."
         }
       ]
     },
@@ -60,33 +99,43 @@
       "id": "api",
       "type": "rect",
       "x": 300,
-      "y": 60,
-      "w": 180,
-      "h": 90,
+      "y": 70,
+      "w": 190,
+      "h": 100,
       "text": "Checkout API",
       "style": {
         "fill": "#ecfdf5",
         "stroke": "#059669"
       },
-      "notes": "Owns the order state machine.",
+      "notes": "# Checkout API\n\nOwns the order state machine, and it is the only writer to @[Postgres].",
       "children": [
         {
           "id": "api-http",
           "type": "rect",
-          "x": 40,
-          "y": 40,
-          "w": 170,
-          "h": 80,
-          "text": "HTTP layer"
+          "x": 60,
+          "y": 60,
+          "w": 190,
+          "h": 90,
+          "text": "HTTP layer",
+          "style": {
+            "fill": "#ecfdf5",
+            "stroke": "#059669"
+          },
+          "notes": "Validation and auth. No business rules live here."
         },
         {
           "id": "api-orders",
           "type": "rect",
-          "x": 40,
-          "y": 190,
-          "w": 170,
-          "h": 80,
-          "text": "Order state"
+          "x": 60,
+          "y": 240,
+          "w": 190,
+          "h": 90,
+          "text": "Order state",
+          "style": {
+            "fill": "#ecfdf5",
+            "stroke": "#059669"
+          },
+          "notes": "`draft → placed → paid → shipped`, and nothing skips a step."
         },
         {
           "id": "api-a1",
@@ -94,37 +143,69 @@
           "from": "api-http",
           "to": "api-orders",
           "fromSide": "bottom",
-          "toSide": "top"
+          "toSide": "top",
+          "text": "command",
+          "notes": "Every transition is a command with an idempotency key, so a retry is free."
         },
         {
           "id": "api-db-link",
           "link": "db",
-          "x": 300,
-          "y": 190,
-          "w": 170,
-          "h": 80
+          "x": 420,
+          "y": 240,
+          "w": 190,
+          "h": 90
         },
         {
           "id": "api-a2",
           "type": "arrow",
           "from": "api-orders",
           "to": "api-db-link",
-          "text": "writes"
+          "text": "writes",
+          "notes": "One transaction per transition. The row *is* the state; there is no cache to go stale."
         }
       ]
     },
     {
       "id": "db",
       "type": "ellipse",
-      "x": 560,
-      "y": 60,
-      "w": 160,
-      "h": 90,
+      "x": 570,
+      "y": 70,
+      "w": 180,
+      "h": 100,
       "text": "Postgres",
       "style": {
         "fill": "#fef3c7",
         "stroke": "#d97706"
-      }
+      },
+      "notes": "Orders, payments and the outbox, in one database. Backed up every hour."
+    },
+    {
+      "id": "psp",
+      "type": "rect",
+      "x": 570,
+      "y": 330,
+      "w": 190,
+      "h": 100,
+      "text": "Payments\nprovider",
+      "style": {
+        "fill": "#f5f3ff",
+        "stroke": "#7c3aed"
+      },
+      "notes": "Third party. Cards go straight from the browser to them; we only ever see a token."
+    },
+    {
+      "id": "decide",
+      "type": "diamond",
+      "x": 300,
+      "y": 330,
+      "w": 190,
+      "h": 110,
+      "text": "Fraud?\ncheck",
+      "style": {
+        "fill": "#fef2f2",
+        "stroke": "#dc2626"
+      },
+      "notes": "Scored in-line, under 80 ms. Anything over the threshold is held for review."
     },
     {
       "id": "a-web-api",
@@ -133,7 +214,8 @@
       "to": "api",
       "fromSide": "right",
       "toSide": "left",
-      "text": "REST"
+      "text": "REST",
+      "notes": "`POST /orders`, one call, and the response is the whole order."
     },
     {
       "id": "a-api-db",
@@ -144,15 +226,6 @@
       "toSide": "left"
     },
     {
-      "id": "decide",
-      "type": "diamond",
-      "x": 300,
-      "y": 330,
-      "w": 180,
-      "h": 110,
-      "text": "Fraud?\ncheck"
-    },
-    {
       "id": "a-api-decide",
       "type": "arrow",
       "from": "api",
@@ -161,31 +234,47 @@
       "toSide": "top"
     },
     {
-      "id": "db-icon",
-      "type": "icon",
-      "x": 610,
-      "y": 330,
-      "w": 64,
-      "h": 64,
-      "text": "storage",
-      "href": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M18.375 9.825Q21 8.65 21 7t-2.625-2.825T12 3T5.625 4.175T3 7t2.625 2.825T12 11t6.375-1.175m-3.812 3.463q1.537-.213 2.962-.688t2.45-1.237T21 9.5V12q0 1.1-1.025 1.863t-2.45 1.237t-2.962.688T12 16t-2.562-.213t-2.963-.687t-2.45-1.237T3 12V9.5q0 1.1 1.025 1.863t2.45 1.237t2.963.688T12 13.5t2.563-.213m0 5q1.537-.212 2.962-.687t2.45-1.237T21 14.5V17q0 1.1-1.025 1.863t-2.45 1.237t-2.962.688T12 21t-2.562-.213t-2.963-.687t-2.45-1.237T3 17v-2.5q0 1.1 1.025 1.863t2.45 1.237t2.963.688T12 18.5t2.563-.213\"/></svg>"
+      "id": "a-decide-psp",
+      "type": "arrow",
+      "from": "decide",
+      "to": "psp",
+      "fromSide": "right",
+      "toSide": "left",
+      "text": "charge",
+      "notes": "Only once the score comes back clean. A held order never reaches the provider."
     },
     {
-      "id": "cloud-icon",
+      "id": "fast-icon",
       "type": "icon",
-      "x": 710,
-      "y": 330,
-      "w": 64,
-      "h": 64,
-      "text": "cdn",
-      "href": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M6.5 20q-2.275 0-3.887-1.575T1 14.575q0-1.95 1.175-3.475T5.25 9.15q.625-2.3 2.5-3.725T12 4q2.925 0 4.963 2.038T19 11q1.725.2 2.863 1.488T23 15.5q0 1.875-1.312 3.188T18.5 20z\"/></svg>"
+      "x": 60,
+      "y": 340,
+      "w": 60,
+      "h": 60,
+      "text": "p99 180 ms",
+      "style": {
+        "textColor": "#059669"
+      },
+      "href": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"m8 22l1-7H4l9-13h2l-1 8h6L10 22z\"/></svg>"
+    },
+    {
+      "id": "pci-icon",
+      "type": "icon",
+      "x": 170,
+      "y": 340,
+      "w": 60,
+      "h": 60,
+      "text": "PCI scope",
+      "style": {
+        "textColor": "#7c3aed"
+      },
+      "href": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M12 22q-3.475-.875-5.738-3.988T4 11.1V5l8-3l8 3v6.1q0 3.8-2.262 6.913T12 22m-2-6h4q.425 0 .713-.288T15 15v-3q0-.425-.288-.712T14 11v-1q0-.825-.587-1.412T12 8t-1.412.588T10 10v1q-.425 0-.712.288T9 12v3q0 .425.288.713T10 16m1-5v-1q0-.425.288-.712T12 9t.713.288T13 10v1z\"/></svg>"
     },
     {
       "id": "caption",
       "type": "text",
       "x": 0,
       "y": 470,
-      "w": 420,
+      "w": 440,
       "h": 24,
       "text": "Click a shape twice to look inside it.",
       "style": {
@@ -196,10 +285,15 @@
     {
       "id": "fraud-ring",
       "type": "draw",
-      "x": 278,
+      "x": 276,
       "y": 312,
-      "w": 224,
+      "w": 238,
       "h": 146,
+      "notes": "Ringed by hand: the fraud step is the one still under review.",
+      "style": {
+        "stroke": "#dc2626",
+        "strokeWidth": 3
+      },
       "points": [
         0.06,
         0.55,
@@ -229,12 +323,7 @@
         0.3,
         0.2,
         0.18
-      ],
-      "notes": "Ringed by hand: the fraud step is the one still under review.",
-      "style": {
-        "stroke": "#dc2626",
-        "strokeWidth": 3
-      }
+      ]
     }
   ]
 }

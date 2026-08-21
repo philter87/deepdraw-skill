@@ -1,7 +1,7 @@
 # Icons
 
 DeepDraw's icon picker searches the public **Iconify** API and stores what comes
-back — raw `<svg>` markup — in the node's `href`. Nothing is fetched at render
+back, raw `<svg>` markup, in the node's `href`. Nothing is fetched at render
 time, so an exported drawing keeps its icons offline. `$SKILL/scripts/iconify.py` calls
 the same two endpoints.
 
@@ -13,7 +13,7 @@ python3 "$SKILL/scripts/iconify.py" search "message queue" --limit 40
 python3 "$SKILL/scripts/iconify.py" search server --sets material-symbols,lucide
 ```
 
-Names are `prefix:name` — `material-symbols:database`, `lucide:server`,
+Names are `prefix:name`: `material-symbols:database`, `lucide:server`,
 `simple-icons:postgresql`. Search ranks whole icon sets ahead of single glyphs,
 so **pass `--sets` when a drawing should keep one visual family**; mixing sets
 in one diagram looks like an accident. Good defaults:
@@ -22,7 +22,7 @@ in one diagram looks like an accident. Good defaults:
 |---|---|
 | `material-symbols` | General UI and infrastructure; what DeepDraw's picker shows first |
 | `lucide` | Lighter line work, when the drawing is mostly strokes |
-| `simple-icons` | Brand marks — AWS, Postgres, GitHub, Kubernetes |
+| `simple-icons` | Brand marks: AWS, Postgres, GitHub, Kubernetes |
 | `logos` | Brand marks **in their own colours** (see below) |
 
 ## Putting it in the drawing
@@ -63,4 +63,4 @@ the markup alone, for pasting into an `href` you are editing.
 
 An icon is a label with a picture on it. A box with a name in it says more, and
 can be drilled into. Use icons for a legend, for a row of technologies, or
-beside a box — not as the boxes themselves.
+beside a box, not as the boxes themselves.

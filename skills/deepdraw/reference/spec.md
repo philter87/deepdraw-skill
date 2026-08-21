@@ -26,6 +26,7 @@ document (`document-format.md`).
 | Field | Default | Meaning |
 |---|---|---|
 | `title` | `"Untitled drawing"` | Names the drawing, the browser tab, and the root of the tree |
+| `notes` | `""` | **The drawing's own markdown.** It lands on the root shape, which is what a reader sees the moment the file opens, before anything is selected. Say what this is, where to start, and what the colours mean. The builder warns when it is missing |
 | `shapes` | `[]` | The top-level drawing, as a list of nodes |
 | `id`, `rootId` | generated / `"root"` | Only worth setting to keep ids stable across rebuilds |
 
@@ -37,15 +38,15 @@ document (`document-format.md`).
 | `type` | `"rect"` | See **Types** below |
 | `x`, `y` | `0` | Top-left corner, in this drawing's own coordinates |
 | `w`, `h` | per type | Size in document units |
-| `text` | `""` | The label drawn on the shape. **Plain text, never wraps** — use `\n` |
+| `text` | `""` | The label drawn on the shape. **Plain text, never wraps**, so put `\n` where a break goes |
 | `notes` (or `markdown`) | `""` | Markdown shown in the notes pane when the shape is selected |
 | `style` | per type | Any subset of the style fields; the rest come from the type |
 | `rotation` | `0` | Degrees clockwise about the shape's centre |
-| `children` | — | This shape's **nested drawing**: the same node grammar, one level down |
-| `groupId` | — | Siblings sharing a string move together |
-| `href` | — | `image`: a `data:` URI. `icon`: raw inline `<svg>` markup |
-| `points` | — | `draw` only: `x, y, x, y…` normalised to the node's own box |
-| `link` | — | Makes this a **link node**: the id of the node it stands in for |
+| `children` | none | This shape's **nested drawing**: the same node grammar, one level down |
+| `groupId` | none | Siblings sharing a string move together |
+| `href` | none | `image`: a `data:` URI. `icon`: raw inline `<svg>` markup |
+| `points` | none | `draw` only: `x, y, x, y…` normalised to the node's own box |
+| `link` | none | Makes this a **link node**: the id of the node it stands in for |
 
 ## Types
 
@@ -54,12 +55,12 @@ document (`document-format.md`).
 | `rect` | 160×100 | Rounded box (`radius: 8`). The workhorse |
 | `ellipse` | 140×100 | Ellipse filling the box |
 | `diamond` | 140×100 | Decisions |
-| `container` | 320×240 | Transparent, dashed, label at the top. Groups shapes *visually* — it does not own them |
+| `container` | 320×240 | Transparent, dashed, label at the top. Groups shapes *visually*; it does not own them |
 | `fatArrow` | 160×70 | A block arrow pointing right; rotate it to point elsewhere |
 | `text` | 160×32 | The label alone: no fill, no stroke, left-aligned |
 | `icon` | 64×64 | Inline SVG in `href`, recoloured with `textColor`, label below |
 | `image` | 160×120 | A `data:` URI in `href`, label below |
-| `arrow` | — | A line with a head; geometry comes from `from`/`to`, not from `x/y/w/h` |
+| `arrow` | none | A line with a head; geometry comes from `from`/`to`, not from `x/y/w/h` |
 | `draw` | 160×100 | A freehand stroke through `points` |
 
 `square` and `group` exist in the model but are legacy or structural; do not
@@ -68,7 +69,7 @@ author them. `root` is created for you.
 ## Style
 
 Any subset. What you leave out comes from the type's own defaults, which are
-already right for that type — override colour and size, rarely the rest.
+already right for that type. Override colour and size, rarely the rest.
 
 | Field | Default | Values |
 |---|---|---|
@@ -81,7 +82,7 @@ already right for that type — override colour and size, rarely the rest.
 | `fontSize` | `14` | Number, in document units |
 | `fontFamily` | `system-ui, sans-serif` | CSS font stack |
 | `hAlign` | `center` | `left` · `center` · `right` |
-| `vAlign` | `middle` | `above` · `top` · `middle` · `bottom` · `below` — `above`/`below` put the label *outside* the shape |
+| `vAlign` | `middle` | `above` · `top` · `middle` · `bottom` · `below`. `above`/`below` put the label *outside* the shape |
 | `opacity` | `1` | 0–1 |
 
 ## Arrows
@@ -101,14 +102,24 @@ which is usually what you want. Pin a `side` when the direction carries meaning
 Shorthand: `"fromSide": "right"` / `"toSide": "left"` beside a plain string
 endpoint does the same thing.
 
-Both ends must be in the **same drawing** as the arrow. An arrow may carry
-`text`, drawn at its midpoint.
+Both ends must be in the **same drawing** as the arrow.
+
+An arrow carries **`text` and `notes`, like any other shape**. The label is one
+or two words drawn at the midpoint; the notes are markdown, and a reader
+clicking the arrow in view mode gets them in the panel exactly as they would for
+a box. That is where the protocol, the payload, the failure mode or the number
+belongs, and it is usually the most interesting thing on the page:
+
+```json
+{ "type": "arrow", "from": "api", "to": "db", "text": "writes",
+  "notes": "One transaction per transition. The row *is* the state." }
+```
 
 ## Links
 
 A link node stands in for a node from somewhere else in the hierarchy: it shows
 that node's content (its nested drawing and notes) while keeping its own
-position, size and — optionally — its own `text` and `style` here.
+position, size and, optionally, its own `text` and `style` here.
 
 ```json
 { "id": "api-db", "link": "db", "x": 300, "y": 190, "w": 170, "h": 80 }
@@ -127,7 +138,7 @@ you want to see:
 "text": "&lt;img&gt; arrives"   // renders the entities literally
 ```
 
-Notes are the opposite — they are markdown, so wrap tag names in backticks
+Notes are the opposite. They are markdown, so wrap tag names in backticks
 (`` `<img>` ``) to keep the renderer from eating them.
 
 ## Mentions in notes
@@ -140,7 +151,7 @@ easy to get wrong because a dead mention still *renders* as a chip:
   captures a single `[\w][\w.-]*` token, so `@Order state` links "Order" and
   leaves " state" as text.
 - **The label must equal the target's whole `text`, exactly** (case-insensitive,
-  trimmed). So **a node whose label contains `\n` can never be mentioned** — the
+  trimmed). So **a node whose label contains `\n` can never be mentioned**: the
   bracket form cannot contain a newline. Note the trap: the hierarchy tree and
   breadcrumb show only the *first line*, so a shape labelled
   `"The wire\nHTTP/0.9 → HTTP/3"` is listed as "The wire", and `@[The wire]`
@@ -149,6 +160,19 @@ easy to get wrong because a dead mention still *renders* as a chip:
 If you want a shape to be mentionable, give it a single-line label and move the
 second line into its `notes`. `--check` reports mentions that resolve to
 nothing.
+
+## What the builder writes
+
+The document it emits is **compact**: every field DeepDraw can work out for
+itself is left out, so the `.deepdraw.json` beside the HTML is a file a person
+can read, and roughly half the size of a full export. Defaults are filled back
+in by whatever reads it, in all three places that read one: the library, the
+server behind deepdraw.ai's Import button, and the standalone page's own boot
+script. Feeding that compact JSON straight back into `build_html.py` reproduces
+the same drawing.
+
+That is worth knowing when you hand-edit a document: **write what changed and
+nothing else**. A node needs a type at most.
 
 ## Building
 
@@ -161,4 +185,4 @@ python3 "$SKILL/scripts/build_html.py" spec.json --seed 7      # reproducible ge
 
 Errors stop the build (an arrow pointing at nothing, a missing style field, a
 `parentId` cycle). Warnings do not (an arrow across drawings, an `icon` with no
-`href`) — read them anyway; both mean the drawing will not look how you meant.
+`href`), but read them anyway: both mean the drawing will not look how you meant.

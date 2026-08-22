@@ -128,6 +128,11 @@ position, size and, optionally, its own `text` and `style` here.
 Use one to draw an arrow at something that lives in another drawing, or to show
 one component in several places without duplicating it.
 
+A link carries **`x`, `y`, `w`, `h`, `text` and `style`, and nothing else**. Its
+notes and its nested drawing are the target's, by definition, so `notes`, `type`,
+`href` and `points` on a link are refused rather than quietly dropped. Leave
+`text` out too and it shows the target's label.
+
 ## Pictures
 
 An `image` node's `href` names a picture three ways, and all three end up as the
@@ -216,5 +221,8 @@ python3 "$SKILL/scripts/build_html.py" spec.json --seed 7      # reproducible ge
 ```
 
 Errors stop the build (an arrow pointing at nothing, a missing style field, a
-`parentId` cycle). Warnings do not (an arrow across drawings, an `icon` with no
-`href`), but read them anyway: both mean the drawing will not look how you meant.
+`parentId` cycle, a `link` carrying notes of its own). Warnings do not (an arrow
+across drawings, an `icon` with no `href`, a label drawn across a box, a line
+through a shape that is neither of its ends, two shapes on top of each other, a
+level laid out at a different scale from the rest, an em dash), but read them
+anyway: both mean the drawing will not look how you meant.

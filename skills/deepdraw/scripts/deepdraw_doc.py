@@ -339,6 +339,16 @@ def _node_from_item(
 
     # A link borrows its target's content; only geometry and overrides are its own.
     if "link" in item:
+        # Anything else here would be dropped on the floor, and the author would
+        # go on believing the panel says what they wrote. It does not: it says
+        # what the target says.
+        ignored = [k for k in ("notes", "markdown", "type", "href", "points") if item.get(k)]
+        if ignored:
+            raise SpecError(
+                f"link node {node_id!r} carries {', '.join(ignored)}, which a link "
+                f"cannot have: it shows its target's notes and its target's nested "
+                f"drawing. A link takes x, y, w, h, text and style, and nothing else"
+            )
         node = {
             "kind": "link",
             "id": node_id,
@@ -563,6 +573,274 @@ def _mention_warnings(doc: dict[str, Any]) -> list[str]:
     return warnings
 
 
+# --- crowding, scale, and the house style ------------------------------------
+
+#: Rough advance width of one character, as a fraction of the font size. The
+#: renderer never measures text (it hands an SVG `<text>` to the browser), so
+#: this is the same estimate `reference/layout.md` tells an author to size a
+#: box with. It is why the checks below allow a few units of slack.
+CHAR_WIDTH = 0.58
+LINE_HEIGHT = 1.25  # `wn()` in the viewer: fontSize * 1.25 per line
+TEXT_PAD = 6        # and its 6 units of padding inside the box
+
+#: How far two things may overlap before it is worth saying so. Small numbers
+#: are the estimate above being wrong; large ones are a label nobody can read.
+CROWDING_SLACK = 6.0
+MAX_CROWDING_WARNINGS = 40
+
+#: Types with a body drawn on the paper, which a label or a line can be lost
+#: against. A `container` is meant to enclose things and a `draw` is meant to be
+#: scribbled over them, so neither counts as being in the way.
+SOLID_TYPES = {"rect", "square", "ellipse", "diamond", "fatArrow", "image", "icon"}
+
+
+def label_box(node: dict[str, Any]) -> dict[str, float] | None:
+    """Where a node's label actually lands, the way `wn()` in the viewer puts it.
+
+    Labels never wrap, so the width comes from the longest line and not from
+    the node's `w`: a `text` node or an `icon` caption routinely draws well
+    outside its own box, which is exactly how it ends up on top of a neighbour.
+    """
+    text = (node.get("text") or "").strip()
+    if not text:
+        return None
+    style = node.get("style") or {}
+    size = float(style.get("fontSize", DEFAULT_STYLE["fontSize"]))
+    lines = text.split("\n")
+    w = max(len(line) for line in lines) * size * CHAR_WIDTH
+    h = len(lines) * size * LINE_HEIGHT
+
+    h_align = style.get("hAlign", "center")
+    if h_align == "left":
+        x = node["x"] + TEXT_PAD
+    elif h_align == "right":
+        x = node["x"] + node["w"] - TEXT_PAD - w
+    else:
+        x = node["x"] + (node["w"] - w) / 2
+
+    v_align = style.get("vAlign", "middle")
+    if v_align == "above":
+        y = node["y"] - h - TEXT_PAD
+    elif v_align == "top":
+        y = node["y"] + TEXT_PAD
+    elif v_align == "bottom":
+        y = node["y"] + node["h"] - h - TEXT_PAD
+    elif v_align == "below":
+        y = node["y"] + node["h"] + TEXT_PAD
+    else:
+        y = node["y"] + (node["h"] - h) / 2
+    return {"x": x, "y": y, "w": w, "h": h}
+
+
+def _contains(outer: dict[str, float], inner: dict[str, float]) -> bool:
+    return (
+        inner["x"] >= outer["x"] and inner["y"] >= outer["y"]
+        and inner["x"] + inner["w"] <= outer["x"] + outer["w"]
+        and inner["y"] + inner["h"] <= outer["y"] + outer["h"]
+    )
+
+
+def _join(ids: list[str]) -> str:
+    quoted = [repr(i) for i in ids]
+    if len(quoted) == 1:
+        return quoted[0]
+    return ", ".join(quoted[:-1]) + " and " + quoted[-1]
+
+
+def _overlap(a: dict[str, float], b: dict[str, float]) -> tuple[float, float]:
+    return (
+        min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]),
+        min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]),
+    )
+
+
+def _crosses(p1: tuple[float, float], p2: tuple[float, float], rect: dict[str, float]) -> bool:
+    """Does the segment pass through the rect, shrunk by the usual slack?
+
+    Liang-Barsky, which is short and does not care which way the segment runs.
+    """
+    x0, y0 = rect["x"] + CROWDING_SLACK, rect["y"] + CROWDING_SLACK
+    x1, y1 = rect["x"] + rect["w"] - CROWDING_SLACK, rect["y"] + rect["h"] - CROWDING_SLACK
+    if x1 <= x0 or y1 <= y0:
+        return False
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, p1[0] - x0), (dx, x1 - p1[0]), (-dy, p1[1] - y0), (dy, y1 - p1[1])):
+        if p == 0:
+            if q < 0:
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+        if t0 > t1:
+            return False
+    return True
+
+
+#: An em dash and its wider cousin. SKILL.md rules them out of every label and
+#: every note, and one is easy to miss in a wall of prose.
+_EM_DASHES = ("\u2014", "\u2015")
+
+
+def _dash_warnings(doc: dict[str, Any]) -> list[str]:
+    """Em dashes, which the skill bans and which are invisible in a diff."""
+    warnings: list[str] = []
+    if any(d in (doc.get("title") or "") for d in _EM_DASHES):
+        warnings.append("the title has an em dash in it; use a comma, a colon or a full stop")
+    for node_id, node in sorted(doc["nodes"].items()):
+        for field in ("text", "markdown"):
+            value = node.get(field) or ""
+            if any(d in value for d in _EM_DASHES):
+                where = "label" if field == "text" else "notes"
+                warnings.append(
+                    f"{node_id!r}: an em dash in its {where}; use a comma, a colon or a full stop"
+                )
+                break
+    return warnings
+
+
+def drawing_extents(doc: dict[str, Any]) -> dict[str, tuple[float, float]]:
+    """The raw width and height of each drawing's contents, keyed by the node
+    you click into. Unlike `canvas_bounds` this does not clamp to MIN_CANVAS,
+    because what matters here is how big the drawing is against its siblings."""
+    extents: dict[str, tuple[float, float]] = {}
+    children: dict[str, list[dict[str, Any]]] = {}
+    for node in doc["nodes"].values():
+        parent = node.get("parentId")
+        if parent is not None:
+            children.setdefault(parent, []).append(node)
+    for parent, kids in children.items():
+        extents[parent] = (
+            max(n["x"] + n["w"] for n in kids) - min(n["x"] for n in kids),
+            max(n["y"] + n["h"] for n in kids) - min(n["y"] for n in kids),
+        )
+    return extents
+
+
+def _scale_warnings(doc: dict[str, Any]) -> list[str]:
+    """Levels laid out at wildly different scales.
+
+    Every drawing is fitted to the pane, so a 400-unit drawing is simply a
+    zoomed-in one: the same `fontSize: 14` comes out three times the size of
+    the same label a level up. Nothing about the file says so, and the author
+    only finds out by clicking through.
+    """
+    extents = drawing_extents(doc)
+    if len(extents) < 3:
+        return []
+    widths = sorted(w for w, _ in extents.values())
+    median = widths[len(widths) // 2]
+    if median <= 0:
+        return []
+
+    warnings: list[str] = []
+    for drawing_id, (w, _) in sorted(extents.items()):
+        if w <= 0:
+            continue
+        if w * 2 < median or w > median * 2:
+            factor = median / w if w < median else w / median
+            bigger = "bigger" if w < median else "smaller"
+            warnings.append(
+                f"{drawing_id!r}: this drawing is {w:.0f} wide where most here are "
+                f"about {median:.0f}, so its labels come out {factor:.1f}x {bigger} "
+                f"than the rest; lay every level out at about the same width"
+            )
+    return warnings
+
+
+def _crowding_warnings(doc: dict[str, Any]) -> list[str]:
+    """Things drawn on top of each other: the failure the file itself cannot show.
+
+    Everything here renders perfectly happily. A label sitting across a box is
+    still drawn, in full, with no background behind it, and the only way to find
+    out is to open the drawing and look. So look here instead, one drawing at a
+    time, since coordinates only mean anything within one.
+    """
+    nodes = doc["nodes"]
+    drawings: dict[str, list[dict[str, Any]]] = {}
+    for node in nodes.values():
+        parent = node.get("parentId")
+        if parent is not None:
+            drawings.setdefault(parent, []).append(node)
+
+    warnings: list[str] = []
+    for siblings in drawings.values():
+        siblings = sorted(siblings, key=lambda n: n["id"])
+        solids = [
+            n for n in siblings
+            if n.get("kind") == "link" or n.get("type") in SOLID_TYPES
+        ]
+        labels = [(n, label_box(n)) for n in siblings if n.get("type") != "container"]
+        labels = [(n, box) for n, box in labels if box]
+        solid_ids = {n["id"] for n in solids}
+
+        for node, box in labels:
+            over = [
+                other["id"] for other in solids
+                if other["id"] != node["id"]
+                and all(d > CROWDING_SLACK for d in _overlap(box, other))
+            ]
+            if over:
+                what = "label" if node.get("type") == "arrow" else "text"
+                warnings.append(
+                    f"{node['id']!r}: its {what} {_short(node)} is drawn across "
+                    f"{_join(over)}; widen the gap, shorten it, or move it"
+                )
+
+        # Labels that leave their own box (an arrow's, a caption, an icon's
+        # text, which is drawn below the glyph) can also land on each other.
+        # A label that stays inside a shape is that shape, and was checked above.
+        stray = [
+            (n, box) for n, box in labels
+            if n["id"] not in solid_ids or not _contains(n, box)
+        ]
+        for i, (node, box) in enumerate(stray):
+            for other, other_box in stray[i + 1:]:
+                if all(d > CROWDING_SLACK for d in _overlap(box, other_box)):
+                    warnings.append(
+                        f"{node['id']!r}: its text {_short(node)} lands on the "
+                        f"label of {other['id']!r}"
+                    )
+
+        for node in siblings:
+            if node.get("kind") != "shape" or node.get("type") != "arrow":
+                continue
+            ends = {(node.get(w) or {}).get("nodeId") for w in ("from", "to")}
+            p1, p2 = arrow_points(doc, node)
+            for other in solids:
+                if other["id"] in ends:
+                    continue
+                if _crosses(p1, p2, other):
+                    warnings.append(
+                        f"{node['id']!r}: the line runs through {other['id']!r}, which is "
+                        f"neither end of it; an arrow is a straight line, so move a box "
+                        f"or pin a `side`"
+                    )
+
+        for i, node in enumerate(solids):
+            for other in solids[i + 1:]:
+                dx, dy = _overlap(node, other)
+                if dx > CROWDING_SLACK and dy > CROWDING_SLACK:
+                    warnings.append(
+                        f"{node['id']!r} and {other['id']!r} overlap by "
+                        f"{dx:.0f}x{dy:.0f}: two shapes on the same paper"
+                    )
+
+    if len(warnings) > MAX_CROWDING_WARNINGS:
+        extra = len(warnings) - MAX_CROWDING_WARNINGS
+        warnings = warnings[:MAX_CROWDING_WARNINGS]
+        warnings.append(f"and {extra} more crowded places, not listed")
+    return warnings
+
+
+def _short(node: dict[str, Any], limit: int = 28) -> str:
+    text = (node.get("text") or "").replace("\n", " ")
+    return repr(text if len(text) <= limit else text[: limit - 1] + "\u2026")
+
+
 def validate(doc: dict[str, Any]) -> list[str]:
     """Raises SpecError on anything that would not render; returns warnings."""
     nodes = doc["nodes"]
@@ -650,6 +928,9 @@ def validate(doc: dict[str, Any]) -> list[str]:
         )
 
     warnings.extend(_mention_warnings(doc))
+    warnings.extend(_dash_warnings(doc))
+    warnings.extend(_crowding_warnings(doc))
+    warnings.extend(_scale_warnings(doc))
 
     # A cycle would make the tree infinite; the renderer walks it by parentId.
     for node_id in nodes:

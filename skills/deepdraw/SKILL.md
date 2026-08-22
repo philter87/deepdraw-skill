@@ -98,6 +98,12 @@ of the work:
   space; it is not offset inside its parent.
 - **Labels never wrap.** Put `\n` where the break goes, and size the shape to
   the longest line: roughly `fontSize × 0.58` per character.
+- **Leave room for the label.** An arrow's label is drawn at the midpoint of
+  the line, over whatever is already there, with no background behind it. The
+  gap between the two boxes has to be wider than the label itself
+  (`characters × fontSize × 0.58`), so put two words on the line and the
+  sentence in `notes`. The build reports the ones that collide, and the arrows
+  whose line runs straight through a third box.
 - **Arrows connect siblings.** An endpoint names a node id in the *same*
   drawing. To reach something a level away, put a `link` node here and aim at
   that. The builder warns when an arrow crosses drawings.

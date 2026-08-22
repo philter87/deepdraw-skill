@@ -19,7 +19,8 @@ Three consequences worth building on:
   **800–1200 units wide**, whichever level it is on, and text stays the same
   size as the reader moves through the hierarchy. Mixing a 400-unit drawing
   with a 1600-unit one makes the same 14pt label look twice as big in one of
-  them.
+  them. The builder warns when one level is more than twice the size of the
+  rest, because nothing in the file itself shows it.
 
 `x`/`y` are the **top-left corner**. Y grows downward. Negative coordinates are
 fine: a drawing is framed by what it holds, not by an origin.
@@ -31,6 +32,7 @@ fine: a drawing is framed by what it holds, not by an origin.
 | Drawing extent, any level | 800–1200 wide |
 | A box with a short label | 160–200 × 80–100 |
 | Gap between boxes on a row | 80–140 |
+| Gap an arrow's **label** has to fit in | wider than the label |
 | Gap between rows | 100–160 |
 | `container` padding around its contents | 40 |
 | Body text | `fontSize` 14 · headings 18–20 · captions 12–13 |
@@ -52,6 +54,31 @@ there. Two things follow:
 how `icon` and `image` are captioned by default. `container` puts its label at
 the top, out of the way of what is inside it.
 
+## Leave room for the label
+
+A label is drawn at the centre of its node's box with **nothing behind it**. No
+halo, no background: a label that lands on a box is simply printed over it, and
+the file cannot tell you, because it renders perfectly.
+
+For an arrow, "its box" is the rectangle spanned by the two endpoints, so the
+label sits at the **midpoint of the line**, in the gap between the two shapes.
+The gap therefore has to be wider than the label:
+
+```
+label width ≈ characters × fontSize × 0.58
+```
+
+"cell to cell" at `fontSize: 14` is about 100 units wide, so two boxes 40 apart
+have it printed across both of them. Widen the gap to 120, or say it in two
+words and move the sentence into `notes`, which is where it wanted to be.
+
+A 40 to 60 unit gap is fine for a **vertical** arrow, where the label lies along
+the gap rather than across it. Horizontal and diagonal runs are what need room.
+
+The same arithmetic governs a `text` node and an `icon`'s caption. Neither wraps
+and neither is clipped to its own `w`, so a 600-unit caption in a 160-wide box
+draws straight across whatever sits to its right.
+
 ## Arrows
 
 An endpoint with no `side` slides around its shape's border to face the other
@@ -65,8 +92,20 @@ keeps doing so if you move a box later. Reach for `side` only when:
 Arrowheads are drawn at the `to` end only. For a two-way relationship, use two
 arrows or say so in the label.
 
+An arrow is a **straight line between two points**, and nothing routes it around
+what is in between. A box in the top left joined to one in the bottom right is
+drawn over everything on that diagonal. When that happens: move a box, pin a
+`side` so the line leaves by a different face, or aim at a `link` node put
+somewhere clearer.
+
 Both ends must live in the **same drawing** as the arrow. To point at something
 a level away, put a `link` node in this drawing and aim at that.
+
+**The builder checks all of this.** `build_html.py` warns about a label drawn
+across a shape, a line running through a shape that is neither of its ends, two
+shapes on top of each other, and two labels on top of each other, naming the
+nodes each time. They are warnings, because the drawing still renders. Read them
+anyway: the only other way to find any of it is to open the file and look.
 
 ## Nesting
 

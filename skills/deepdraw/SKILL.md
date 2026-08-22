@@ -23,7 +23,7 @@ conversation, and ask when it is not obvious.
 ## Workflow
 
 1. **Plan the hierarchy.** What are the 4 to 8 shapes on the top level, and what
-   does each one contain? Depth is the point; two or three levels is normal.
+   does each one contain? Depth is the point; two or three levels is normal. But remember to also sometimes group shapes within a dashed rect (container) on a single level 
 2. **Read `$SKILL/reference/spec.md`** for the grammar and
    `$SKILL/reference/layout.md` for coordinates, sizing and colour. Then write
    the spec to a `.json` file.

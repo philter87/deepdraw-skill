@@ -43,7 +43,7 @@ conversation, and ask when it is not obvious.
 
 ## Make it worth looking at
 
-A correct drawing nobody wants to read is a failed drawing. Four things do most
+A correct drawing nobody wants to read is a failed drawing. Five things do most
 of the work:
 
 - **Colour carries a distinction.** Pick one thing colour means in this drawing
@@ -55,6 +55,16 @@ of the work:
   browser, a lock, a robot. Use `icon` nodes for things that are more picture
   than prose, and set `style.textColor` to tint the glyph to match its
   neighbours. Two or three per level is plenty.
+- **Real pictures are allowed, and are often the whole point.** An `image`
+  node's `href` takes a **file path** (relative to the spec) or an **http(s)
+  address** as readily as a `data:` URI: a screenshot, a logo, a photograph of
+  the whiteboard this drawing came from. The builder reads it in and inlines it,
+  so the `.html` carries the picture itself; a link it cannot fetch stops the
+  build rather than shipping a drawing with a hole in it. PNG, JPEG, GIF, WebP
+  and AVIF (an SVG belongs in an `icon` node). **Keep them small**: deepdraw.ai
+  gives an anonymous browser **5 MB** of image storage, 50 MB signed in, so a
+  drawing heavier than that is one to import signed in. Details in
+  `reference/spec.md` under Pictures.
 - **The pencil is for annotation.** A `draw` node is a freehand stroke through
   `points`, normalised to its own box, so `[0, 0.5, 1, 0.5]` is a line straight
   across the middle. Ring the thing that is under discussion, underline the hot

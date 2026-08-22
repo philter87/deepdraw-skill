@@ -10,6 +10,10 @@ browser and imports back into deepdraw.ai through Import → File.
 
 `--json` writes the canonical document beside it, which is the other format
 deepdraw.ai imports.
+
+An `image` node's `href` may be a `data:` URI, a path to a file beside the spec,
+or an http(s) address; the last two are read in and inlined here, so what is
+written stands on its own (`inline_images.py` says why that matters).
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from deepdraw_doc import SpecError, build_document, canvas_bounds, compact, validate  # noqa: E402
+from inline_images import ImageError, inline_images  # noqa: E402
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "reference" / "template.html"
 TITLE_MARK = "__DEEPDRAW_TITLE__"
@@ -75,6 +80,16 @@ def main() -> int:
         warnings = validate(document)
     except SpecError as error:
         print(f"{spec_path}: this spec cannot be drawn\n{error}", file=sys.stderr)
+        return 1
+
+    # Pictures become the bytes themselves, so the file that leaves here needs
+    # nothing else to render. A picture that cannot be read is a refusal rather
+    # than a warning: a drawing quietly missing the image somebody asked for is
+    # the exact failure inlining exists to prevent.
+    try:
+        warnings += inline_images(document, spec_path.resolve().parent)
+    except ImageError as error:
+        print(f"{spec_path}: this drawing's pictures could not be read\n{error}", file=sys.stderr)
         return 1
 
     for warning in warnings:

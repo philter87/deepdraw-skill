@@ -44,7 +44,7 @@ document (`document-format.md`).
 | `rotation` | `0` | Degrees clockwise about the shape's centre |
 | `children` | none | This shape's **nested drawing**: the same node grammar, one level down |
 | `groupId` | none | Siblings sharing a string move together |
-| `href` | none | `image`: a `data:` URI. `icon`: raw inline `<svg>` markup |
+| `href` | none | `image`: a file path, an http(s) address, or a `data:` URI (see [Pictures](#pictures)). `icon`: raw inline `<svg>` markup |
 | `points` | none | `draw` only: `x, y, x, y…` normalised to the node's own box |
 | `link` | none | Makes this a **link node**: the id of the node it stands in for |
 
@@ -59,7 +59,7 @@ document (`document-format.md`).
 | `fatArrow` | 160×70 | A block arrow pointing right; rotate it to point elsewhere |
 | `text` | 160×32 | The label alone: no fill, no stroke, left-aligned |
 | `icon` | 64×64 | Inline SVG in `href`, recoloured with `textColor`, label below |
-| `image` | 160×120 | A `data:` URI in `href`, label below |
+| `image` | 160×120 | A picture named by `href`, label below (see [Pictures](#pictures)) |
 | `arrow` | none | A line with a head; geometry comes from `from`/`to`, not from `x/y/w/h` |
 | `draw` | 160×100 | A freehand stroke through `points` |
 
@@ -127,6 +127,38 @@ position, size and, optionally, its own `text` and `style` here.
 
 Use one to draw an arrow at something that lives in another drawing, or to show
 one component in several places without duplicating it.
+
+## Pictures
+
+An `image` node's `href` names a picture three ways, and all three end up as the
+same thing in the file that is written:
+
+```jsonc
+"href": "./screenshots/dashboard.png"        // a file, relative to the spec
+"href": "https://example.com/logo.png"       // an address
+"href": "data:image/png;base64,iVBORw0K…"    // the bytes already
+```
+
+**The builder reads the first two in and inlines them**, so the `.html` it
+writes carries the picture itself and needs nothing else to render. That is what
+makes it work when it is mailed on, when it is imported into deepdraw.ai (whose
+`img-src` refuses to load a picture from another origin), and when it is
+exported to PNG (where an SVG rasterized through an `<img>` loads no external
+references at all).
+
+- **A picture that cannot be read stops the build.** A 404, a path that does not
+  exist, a file that turns out to be HTML. Each is an error naming the node, not
+  a warning. A drawing quietly missing a picture is the failure inlining exists
+  to prevent.
+- **PNG, JPEG, GIF, WebP and AVIF.** Not SVG: a vector glyph belongs in an
+  `icon` node, which takes inline `<svg>` markup and draws in whatever colour
+  the shape's `textColor` says.
+- **Keep them small.** One picture over 2 MB is warned about, over 10 MB is
+  refused, and the whole drawing passing 5 MB is warned about too. That last
+  number is the image storage deepdraw.ai gives an **anonymous** browser (50 MB
+  signed in), so a picture-heavy drawing is one to import signed in.
+- **Size the node to the picture's aspect ratio.** The image is fitted inside
+  `w`×`h` (`xMidYMid meet`), so a wrong ratio is empty space, not a stretch.
 
 ## Labels are plain text
 

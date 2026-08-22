@@ -95,8 +95,11 @@ Type-specific fields:
   arrow itself are the bounding box of the line as drawn; the renderer
   recomputes them from the endpoints, so they are a record, not an input.
 - `icon`: `href` holds **raw inline SVG markup**, not a URL.
-- `image`: `href` holds a `data:` URI. An export inlines remote images, so a
-  file that leaves DeepDraw keeps working when it is moved.
+- `image`: `href` holds a `data:` URI, or a URL DeepDraw itself serves. An
+  export inlines whatever is referenced, so a file that leaves DeepDraw keeps
+  working when it is moved. A spec may also name a file or an http(s) address
+  and `build_html.py` inlines it (`spec.md`, Pictures); what it *writes* is
+  always a `data:` URI.
 - `draw`: `points`, flat `x, y, x, y…` normalised to the node's own box (`0` is
   its left/top edge, `1` its right/bottom). That is what makes a stroke an
   ordinary shape: move, resize and rotate are the same arithmetic as for a box.

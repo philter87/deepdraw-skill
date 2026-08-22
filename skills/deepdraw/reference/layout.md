@@ -1,26 +1,43 @@
 # Laying out a drawing
 
-## There is no page
+## There is no page, but there is a pane
 
 DeepDraw has no fixed canvas size. A drawing's canvas is **whatever it
 contains**, grown about its centre until neither side is shorter than **300
 document units**, and that rectangle is then fitted into the pane with 32 units
-of padding. Zoom is capped at 8×.
+of padding.
 
-Three consequences worth building on:
+The pane is smaller than you think. The hierarchy tree on one side and the
+notes panel on the other take roughly **half the window**, so on a 1440-wide
+screen the drawing gets about **850 × 800 px**, and on a 1280-wide one about
+**690 × 700**. Take off the padding and the honest budget is around
+**620 × 640 px**.
 
-- **Coordinates are relative.** Only the ratios between your numbers matter.
-  Everything below is a scale, not a size.
-- **A small drawing is a zoomed-in drawing.** Four boxes across 400 units fill
-  the screen just as four boxes across 1200 units do, but at 3× the apparent
-  font size. So `fontSize: 14` means something only next to the drawing's own
-  extent.
+Four consequences worth building on:
+
+- **A unit is about a pixel.** Not exactly, but close enough to design with: a
+  drawing laid out 620 units wide fills the pane at roughly 1:1, so `fontSize:
+  14` arrives on screen as 14 px. Draw at the size you want it read at.
+- **A big drawing is a shrunk drawing.** Fit scale is
+  `(620 ÷ drawing width)`, and it applies to the text too. The same
+  `fontSize: 14` comes out at 14 px in a 600-wide drawing, 11 px in an
+  800-wide one, and **9 px in a 1200-wide one**, which is the usual reason a
+  finished drawing turns out unreadable. There is no zoom cap downward: nothing
+  stops a wide drawing from shrinking its own labels into noise.
 - **Keep every level to the same scale.** Lay each drawing out around
-  **800–1200 units wide**, whichever level it is on, and text stays the same
-  size as the reader moves through the hierarchy. Mixing a 400-unit drawing
-  with a 1600-unit one makes the same 14pt label look twice as big in one of
-  them. The builder warns when one level is more than twice the size of the
-  rest, because nothing in the file itself shows it.
+  **500–700 units wide, and no taller than it is wide** (the pane is close to
+  square, so height costs the same as width), whichever level it is on,
+  and text stays both readable and the same size as the reader moves through
+  the hierarchy. Mixing a 400-unit drawing with a 1600-unit one makes the same
+  14pt label look four times as big in one of them. The builder warns when one
+  level is more than twice the size of the rest, and again when a level is laid
+  out so wide that its own labels land under 11 px, because nothing in the file
+  itself shows either.
+- **If a level truly needs more room, scale the type with it.** Width and
+  `fontSize` have to move together: `fontSize ≈ width ÷ 45` keeps labels at
+  about 14 px on screen. A 900-unit level wants `fontSize: 20` on every node in
+  it, and boxes about a third larger to hold the same words. Prefer splitting
+  the level into a nested drawing over growing it.
 
 `x`/`y` are the **top-left corner**. Y grows downward. Negative coordinates are
 fine: a drawing is framed by what it holds, not by an origin.
@@ -29,13 +46,17 @@ fine: a drawing is framed by what it holds, not by an origin.
 
 | | Units |
 |---|---|
-| Drawing extent, any level | 800–1200 wide |
-| A box with a short label | 160–200 × 80–100 |
-| Gap between boxes on a row | 80–140 |
+| Drawing extent, any level | 500–700 wide · no taller than wide |
+| A box with a short label | 140–190 × 70–90 |
+| Gap between boxes on a row | 60–100 |
 | Gap an arrow's **label** has to fit in | wider than the label |
-| Gap between rows | 100–160 |
-| `container` padding around its contents | 40 |
+| Gap between rows | 80–120 |
+| `container` padding around its contents | 30–40 |
 | Body text | `fontSize` 14 · headings 18–20 · captions 12–13 |
+
+Three boxes across a row is comfortable at this scale, four is tight, five
+wants either a nested level or the bigger type above. That is the constraint
+doing its job: a level with eight boxes on it was two levels all along.
 
 ## Labels do not wrap
 
@@ -69,14 +90,15 @@ label width ≈ characters × fontSize × 0.58
 ```
 
 "cell to cell" at `fontSize: 14` is about 100 units wide, so two boxes 40 apart
-have it printed across both of them. Widen the gap to 120, or say it in two
-words and move the sentence into `notes`, which is where it wanted to be.
+have it printed across both of them. At this scale a gap that wide is most of a
+row, so the fix is usually the label, not the gap: say it in two words and move
+the sentence into `notes`, which is where it wanted to be.
 
 A 40 to 60 unit gap is fine for a **vertical** arrow, where the label lies along
 the gap rather than across it. Horizontal and diagonal runs are what need room.
 
 The same arithmetic governs a `text` node and an `icon`'s caption. Neither wraps
-and neither is clipped to its own `w`, so a 600-unit caption in a 160-wide box
+and neither is clipped to its own `w`, so a 300-unit caption in a 160-wide box
 draws straight across whatever sits to its right.
 
 ## Arrows
@@ -112,8 +134,10 @@ anyway: the only other way to find any of it is to open the file and look.
 This is the whole reason to use DeepDraw, and the part a flat diagram gets
 wrong. Some patterns that work:
 
-- **System → service → internals.** The top level is the 5–8 boxes someone
-  should remember; each one contains how it is actually built.
+- **System → service → internals.** The top level is the 4–6 boxes someone
+  should remember, two rows of three at this scale; each one contains how it is
+  actually built. A level that will not fit in 700 units is a level that wanted
+  splitting.
 - **A `container` is not a parent.** It draws a dashed region around shapes that
   are its *siblings*: a zone, an environment, a team boundary. Nesting is
   `children`; grouping visually is a container. They are different tools and

@@ -22,7 +22,7 @@ conversation, and ask when it is not obvious.
 
 ## Workflow
 
-1. **Plan the hierarchy.** What are the 4 to 8 shapes on the top level, and what
+1. **Plan the hierarchy.** What are the 4 to 6 shapes on the top level, and what
    does each one contain? Depth is the point; two or three levels is normal. But remember to also sometimes group shapes within a dashed rect (container) on a single level 
 2. **Read `$SKILL/reference/spec.md`** for the grammar and
    `$SKILL/reference/layout.md` for coordinates, sizing and colour. Then write
@@ -90,10 +90,13 @@ of the work:
   retry policy or the number goes. A reader clicking an arrow in view mode gets
   that panel, exactly as they do for a box. Use it: the interesting part of most
   diagrams is the arrows.
-- **Every drawing is auto-fitted to the pane**, so coordinates are *relative*
-  and a small drawing is simply zoomed in more. Lay out around 800 to 1200 units
-  wide at **every** level, or the same font size changes apparent size as the
-  reader moves through the hierarchy.
+- **Draw small: a unit is about a pixel.** Every drawing is auto-fitted to the
+  pane, and the pane is only about 620 px wide once the hierarchy tree and the
+  notes panel have taken their half. A 1200-unit level is shrunk to half size,
+  and its `fontSize: 14` labels arrive at 9 px. Lay out **500 to 700 units wide
+  at every level**, and no taller than wide: that keeps text readable, and keeps
+  it the same size as the reader moves through the hierarchy. A level that needs
+  more room needs splitting, or `fontSize ≈ width ÷ 45` on every node in it.
 - **Coordinates are per drawing.** A nested drawing starts its own coordinate
   space; it is not offset inside its parent.
 - **Labels never wrap.** Put `\n` where the break goes, and size the shape to

@@ -7,8 +7,8 @@
       "type": "container",
       "x": 0,
       "y": 0,
-      "w": 780,
-      "h": 280,
+      "w": 624,
+      "h": 224,
       "text": "Edge",
       "notes": "Everything in here is deployed to the CDN edge, close to the customer.",
       "style": {
@@ -18,10 +18,10 @@
     {
       "id": "web",
       "type": "rect",
-      "x": 40,
-      "y": 70,
-      "w": 190,
-      "h": 100,
+      "x": 32,
+      "y": 56,
+      "w": 152,
+      "h": 80,
       "text": "Web app",
       "style": {
         "fill": "#eff6ff",
@@ -32,10 +32,10 @@
         {
           "id": "web-cart",
           "type": "rect",
-          "x": 60,
-          "y": 80,
-          "w": 200,
-          "h": 100,
+          "x": 48,
+          "y": 64,
+          "w": 160,
+          "h": 80,
           "text": "Cart",
           "style": {
             "fill": "#eff6ff",
@@ -46,10 +46,10 @@
         {
           "id": "web-cart-icon",
           "type": "icon",
-          "x": 130,
-          "y": 210,
-          "w": 56,
-          "h": 56,
+          "x": 104,
+          "y": 168,
+          "w": 45,
+          "h": 45,
           "text": "basket",
           "style": {
             "textColor": "#2563eb"
@@ -59,10 +59,10 @@
         {
           "id": "web-pay",
           "type": "rect",
-          "x": 400,
-          "y": 80,
-          "w": 200,
-          "h": 100,
+          "x": 440,
+          "y": 64,
+          "w": 160,
+          "h": 80,
           "text": "Pay sheet",
           "style": {
             "fill": "#eff6ff",
@@ -73,10 +73,10 @@
         {
           "id": "web-pay-icon",
           "type": "icon",
-          "x": 472,
-          "y": 210,
-          "w": 56,
-          "h": 56,
+          "x": 498,
+          "y": 168,
+          "w": 45,
+          "h": 45,
           "text": "card",
           "style": {
             "textColor": "#2563eb"
@@ -98,10 +98,10 @@
     {
       "id": "api",
       "type": "rect",
-      "x": 300,
-      "y": 70,
-      "w": 190,
-      "h": 100,
+      "x": 240,
+      "y": 56,
+      "w": 152,
+      "h": 80,
       "text": "Checkout API",
       "style": {
         "fill": "#ecfdf5",
@@ -112,10 +112,10 @@
         {
           "id": "api-http",
           "type": "rect",
-          "x": 60,
-          "y": 60,
-          "w": 190,
-          "h": 90,
+          "x": 48,
+          "y": 48,
+          "w": 152,
+          "h": 72,
           "text": "HTTP layer",
           "style": {
             "fill": "#ecfdf5",
@@ -126,10 +126,10 @@
         {
           "id": "api-orders",
           "type": "rect",
-          "x": 60,
-          "y": 240,
-          "w": 190,
-          "h": 90,
+          "x": 48,
+          "y": 192,
+          "w": 152,
+          "h": 72,
           "text": "Order state",
           "style": {
             "fill": "#ecfdf5",
@@ -150,10 +150,10 @@
         {
           "id": "api-db-link",
           "link": "db",
-          "x": 420,
-          "y": 240,
-          "w": 190,
-          "h": 90
+          "x": 448,
+          "y": 192,
+          "w": 152,
+          "h": 72
         },
         {
           "id": "api-a2",
@@ -168,10 +168,10 @@
     {
       "id": "db",
       "type": "ellipse",
-      "x": 570,
-      "y": 70,
-      "w": 180,
-      "h": 100,
+      "x": 456,
+      "y": 56,
+      "w": 144,
+      "h": 80,
       "text": "Postgres",
       "style": {
         "fill": "#fef3c7",
@@ -182,10 +182,10 @@
     {
       "id": "psp",
       "type": "rect",
-      "x": 570,
-      "y": 330,
-      "w": 190,
-      "h": 100,
+      "x": 456,
+      "y": 264,
+      "w": 152,
+      "h": 80,
       "text": "Payments\nprovider",
       "style": {
         "fill": "#f5f3ff",
@@ -196,10 +196,10 @@
     {
       "id": "decide",
       "type": "diamond",
-      "x": 300,
-      "y": 330,
-      "w": 190,
-      "h": 110,
+      "x": 240,
+      "y": 264,
+      "w": 152,
+      "h": 88,
       "text": "Fraud?\ncheck",
       "style": {
         "fill": "#fef2f2",
@@ -246,10 +246,10 @@
     {
       "id": "fast-icon",
       "type": "icon",
-      "x": 60,
-      "y": 340,
-      "w": 60,
-      "h": 60,
+      "x": 48,
+      "y": 272,
+      "w": 48,
+      "h": 48,
       "text": "p99 180 ms",
       "style": {
         "textColor": "#059669"
@@ -259,10 +259,10 @@
     {
       "id": "pci-icon",
       "type": "icon",
-      "x": 170,
-      "y": 340,
-      "w": 60,
-      "h": 60,
+      "x": 136,
+      "y": 272,
+      "w": 48,
+      "h": 48,
       "text": "PCI scope",
       "style": {
         "textColor": "#7c3aed"
@@ -273,9 +273,9 @@
       "id": "caption",
       "type": "text",
       "x": 0,
-      "y": 470,
-      "w": 440,
-      "h": 24,
+      "y": 376,
+      "w": 352,
+      "h": 19,
       "text": "Click a shape twice to look inside it.",
       "style": {
         "fontSize": 13,
@@ -285,10 +285,10 @@
     {
       "id": "fraud-ring",
       "type": "draw",
-      "x": 276,
-      "y": 312,
-      "w": 238,
-      "h": 146,
+      "x": 221,
+      "y": 250,
+      "w": 190,
+      "h": 117,
       "notes": "Ringed by hand: the fraud step is the one still under review.",
       "style": {
         "stroke": "#dc2626",

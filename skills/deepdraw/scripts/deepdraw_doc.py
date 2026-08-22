@@ -11,6 +11,7 @@ dictionaries, so it can be imported and unit-tested on its own.
 
 from __future__ import annotations
 
+import math
 import random
 import re
 import string
@@ -720,6 +721,60 @@ def drawing_extents(doc: dict[str, Any]) -> dict[str, tuple[float, float]]:
     return extents
 
 
+#: The drawing pane, in CSS pixels, on a laptop-sized window. The hierarchy
+#: tree and the notes panel take about half of it, so a 1280-wide window leaves
+#: roughly 690x700 for the drawing, and the 32-unit fit padding takes the rest.
+#: A level laid out this wide arrives on screen at about 1:1.
+PANE = (620.0, 640.0)
+
+#: Below this, in CSS pixels, a label is there but nobody reads it.
+MIN_READABLE_PX = 11.0
+
+
+def _readability_warnings(doc: dict[str, Any]) -> list[str]:
+    """Levels laid out so wide that their own labels come out too small.
+
+    A drawing is fitted to the pane, text and all, so the apparent size of a
+    label is `fontSize x (pane / drawing width)`. Lay a level out 1200 units
+    wide and `fontSize: 14` reaches the reader at 9 px. The file renders
+    perfectly and says nothing about it.
+    """
+    extents = drawing_extents(doc)
+    nodes = doc["nodes"]
+    children: dict[str, list[dict[str, Any]]] = {}
+    for node in nodes.values():
+        parent = node.get("parentId")
+        if parent is not None:
+            children.setdefault(parent, []).append(node)
+
+    warnings: list[str] = []
+    for drawing_id, (w, h) in sorted(extents.items()):
+        w = max(w, float(MIN_CANVAS))
+        h = max(h, float(MIN_CANVAS))
+        scale = min(PANE[0] / w, PANE[1] / h)
+        if scale >= 1:
+            continue
+        sizes = [
+            float((n.get("style") or {}).get("fontSize", DEFAULT_STYLE["fontSize"]))
+            for n in children.get(drawing_id, [])
+            if (n.get("text") or "").strip()
+        ]
+        if not sizes:
+            continue
+        smallest = min(sizes)
+        rendered = smallest * scale
+        if rendered >= MIN_READABLE_PX:
+            continue
+        wants = math.ceil(MIN_READABLE_PX / scale)
+        warnings.append(
+            f"{drawing_id!r}: this drawing is {w:.0f}x{h:.0f}, so it is shrunk to "
+            f"{scale:.2f}x to fit the pane and its {smallest:.0f}pt labels reach the "
+            f"reader at {rendered:.0f} px; lay it out closer to {PANE[0]:.0f} wide, or "
+            f"raise every fontSize in it to about {wants:.0f}"
+        )
+    return warnings
+
+
 def _scale_warnings(doc: dict[str, Any]) -> list[str]:
     """Levels laid out at wildly different scales.
 
@@ -931,6 +986,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
     warnings.extend(_dash_warnings(doc))
     warnings.extend(_crowding_warnings(doc))
     warnings.extend(_scale_warnings(doc))
+    warnings.extend(_readability_warnings(doc))
 
     # A cycle would make the tree infinite; the renderer walks it by parentId.
     for node_id in nodes:

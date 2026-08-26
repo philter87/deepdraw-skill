@@ -31,6 +31,16 @@ from inline_images import ImageError, inline_images  # noqa: E402
 TEMPLATE = Path(__file__).resolve().parent.parent / "reference" / "template.html"
 TITLE_MARK = "__DEEPDRAW_TITLE__"
 DOCUMENT_MARK = "__DEEPDRAW_DOCUMENT_JSON__"
+CREDIT_MARK = "__DEEPDRAW_CREDIT__"
+
+# The corner's second name. DeepDraw signs the page it writes; a page this skill
+# wrote is signed by the skill too, because whoever wants another drawing like
+# this one wants the thing that made it. The shape is `toStandaloneHtml`'s own,
+# so a file from here and a file exported from the app are the same file.
+CREDIT = (
+    ' &middot; <a href="https://github.com/philter87/deepdraw-skill"'
+    ' target="_blank" rel="noreferrer noopener">deepdraw-skill</a>'
+)
 
 _HTML_ESCAPES = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}
 
@@ -49,12 +59,37 @@ def embed(document: dict) -> str:
     return json.dumps(document, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
 
 
+def fill(template: str, mark: str, value: str) -> str:
+    """Fills one hole, and insists there was exactly one of it.
+
+    The count is the whole point. The template inlines DeepDraw's bundle, and
+    that bundle *states these marks itself* — `TEMPLATE_MARKS` is one of its
+    exports. A template built the old way (export a drawing, cut the pieces back
+    out with a regex) therefore carried a second copy of every mark inside the
+    minified source, and this replacement filled that one in too: the drawing's
+    title and its entire JSON spliced into a string literal in the library. The
+    page loaded, the script failed to parse, and nothing rendered at all — for
+    every drawing this skill produced.
+
+    `templateHtml` on the library side now hides its own copies, so there is
+    genuinely one of each. This is what says so instead of assuming it: a
+    template that regains a duplicate is a loud failure here rather than a blank
+    page somebody else opens.
+    """
+    found = template.count(mark)
+    if found != 1:
+        raise SystemExit(
+            f"{TEMPLATE}: {mark} appears {found} times, not once — "
+            "rebuild it with `node tools/build-template.mjs`."
+        )
+    return template.replace(mark, value)
+
+
 def to_standalone_html(document: dict) -> str:
     template = TEMPLATE.read_text(encoding="utf-8")
-    if TITLE_MARK not in template or DOCUMENT_MARK not in template:
-        raise SystemExit(f"{TEMPLATE} has lost its placeholders")
-    html = template.replace(TITLE_MARK, escape_html(document.get("title") or "DeepDraw"))
-    return html.replace(DOCUMENT_MARK, embed(document))
+    html = fill(template, TITLE_MARK, escape_html(document.get("title") or "DeepDraw"))
+    html = fill(html, DOCUMENT_MARK, embed(document))
+    return fill(html, CREDIT_MARK, CREDIT)
 
 
 def main() -> int:

@@ -95,13 +95,26 @@ go to edit a drawing after the fact.
 
 ## Rebuilding the template
 
-`skills/deepdraw/reference/template.html` is DeepDraw's own HTML export with the
-title and the document punched out of it. It is generated, not edited. With a
-DeepDraw checkout beside this one and its library built:
+`skills/deepdraw/reference/template.html` is the standalone page DeepDraw's
+library hands over, with three holes in it — the title, the document and the
+credit. It is generated, not edited, and it comes from the library's own
+`templateHtml` rather than being carved out of an export here: the bundle states
+those marks itself, so a page cut out by hand carries a second copy of each
+inside the minified source, and filling the holes then fills those in too. With
+a DeepDraw checkout beside this one and its library built:
 
 ```bash
 node tools/build-template.mjs --deepdraw ../deepdraw
+node tools/check-output.mjs
 ```
+
+**Run the check.** It builds the bundled example and takes the page apart —
+above all, it runs the parser over the inlined library. That is the failure that
+went unnoticed through two releases: the pages were the right size and opened
+without complaint, and every one of them was blank, because the drawing's JSON
+had been spliced into a string literal in the library and the script threw on
+load. There is nothing to see from the outside, so it has to be checked from the
+inside.
 
 ## Licence
 

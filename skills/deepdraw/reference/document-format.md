@@ -83,17 +83,18 @@ Each rule is the obvious reading of an absence:
 | a root node | one is created, so a bare list of shapes is a one-level drawing |
 | an arrow endpoint written as `"api"` | `{ "nodeId": "api" }` |
 
-`build_html.py` writes documents this way (`compact` in `deepdraw_doc.py`), so
-the `.deepdraw.json` beside a drawing is about half the size of a full export
-and is a file a person can read. It is idempotent in both directions: a full
-export compacts, a compact document expands, and either can be fed back into the
-builder.
+`build_html.py` relies on every one of those rules: it writes what the spec
+said and leaves the rest out rather than filling it in, so the `.deepdraw.json`
+beside a drawing is about half the size of a full export and is a file a person
+can read. Both directions work: a full export can be fed back into the builder,
+and so can a document hand-edited down to the parts somebody cared about.
 
 Type-specific fields:
 
 - `arrow`: `from` and `to`, each `{ nodeId?, side?, x?, y? }`. `x/y/w/h` on the
   arrow itself are the bounding box of the line as drawn; the renderer
-  recomputes them from the endpoints, so they are a record, not an input.
+  recomputes them from the endpoints, so they are a record, not an input, and
+  the builder leaves them out of what it writes.
 - `icon`: `href` holds **raw inline SVG markup**, not a URL.
 - `image`: `href` holds a `data:` URI, or a URL DeepDraw itself serves. An
   export inlines whatever is referenced, so a file that leaves DeepDraw keeps

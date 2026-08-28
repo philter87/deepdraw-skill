@@ -19,17 +19,28 @@ from typing import Any
 
 DOC_VERSION = 1
 
-# --- the pieces of the model the library defines -----------------------------
+# --- what the checks here need to know about the model ------------------------
+#
+# A document written by this builder carries **only what the author set**, and
+# every reader fills the rest in before anything renders: `normalizeDocument` in
+# `lib/src/model.ts`, `DocumentDefaults` on the server, and the standalone page,
+# which is the library again. So nothing below is a default waiting to be
+# written into a file; a node is built from what the spec says and no more.
+#
+# What is mirrored from the library is the little the *checks* need in order to
+# work out where things land on the paper: the size each type is drawn at, and
+# where its text sits inside it. A new shape type only has to appear here if it
+# differs from a rect in one of those two ways.
 
 SHAPE_TYPES = {
     "root", "rect", "square", "ellipse", "diamond", "fatArrow",
-    "container", "text", "image", "icon", "arrow", "draw", "group",
+    "container", "sticky", "text", "image", "icon", "arrow", "draw", "group",
 }
 
 #: Types the toolbar offers. `square` is legacy (a rect with radius 0) and
 #: `root`/`group` are structural, so a spec should stick to these.
 AUTHORABLE_TYPES = {
-    "rect", "ellipse", "diamond", "fatArrow", "container",
+    "rect", "ellipse", "diamond", "fatArrow", "container", "sticky",
     "text", "image", "icon", "arrow", "draw",
 }
 
@@ -38,41 +49,45 @@ H_ALIGNS = {"left", "center", "right"}
 V_ALIGNS = {"above", "top", "middle", "bottom", "below"}
 SIDES = {"top", "right", "bottom", "left"}
 
-DEFAULT_STYLE: dict[str, Any] = {
-    "fill": "#ffffff",
-    "stroke": "#334155",
-    "strokeWidth": 2,
-    "strokeStyle": "solid",
-    "radius": 8,
-    "textColor": "#0f172a",
+#: Every style property the model has, as names only. Three of them carry
+#: values here (below); the rest are listed so that a misspelled one can be
+#: pointed out, because DeepDraw drops what it does not recognise in silence.
+STYLE_KEYS = {
+    "fill", "stroke", "strokeWidth", "strokeStyle", "radius", "textColor",
+    "fontSize", "fontFamily", "hAlign", "vAlign", "opacity",
+    "arrowStart", "arrowEnd",
+}
+
+#: How big a label is and where it sits when nothing says otherwise. These are
+#: the only style *values* the checks read: everything else about a style is
+#: colour, and colour cannot put a label on top of a box.
+DEFAULT_TEXT_STYLE: dict[str, Any] = {
     "fontSize": 14,
-    "fontFamily": "system-ui, sans-serif",
     "hAlign": "center",
     "vAlign": "middle",
-    "opacity": 1,
 }
 
-#: Per-type deviations from DEFAULT_STYLE, exactly as `model.ts` applies them.
-TYPE_STYLE: dict[str, dict[str, Any]] = {
-    "root": {"fill": "transparent", "stroke": "transparent", "strokeWidth": 0, "radius": 0},
-    "square": {"radius": 0},
-    "ellipse": {"radius": 0},
-    "diamond": {"radius": 0},
-    "container": {"fill": "transparent", "strokeStyle": "dashed", "vAlign": "top", "radius": 4},
-    "text": {"fill": "transparent", "stroke": "transparent", "strokeWidth": 0, "hAlign": "left"},
-    "image": {"fill": "transparent", "stroke": "transparent", "strokeWidth": 0, "vAlign": "below"},
-    "icon": {"fill": "transparent", "stroke": "transparent", "strokeWidth": 0, "vAlign": "below"},
-    "arrow": {"fill": "none", "strokeWidth": 2},
-    "draw": {"fill": "none", "strokeWidth": 2, "radius": 0},
-    "fatArrow": {"fill": "#e2e8f0"},
-    "group": {"fill": "transparent", "stroke": "transparent", "strokeWidth": 0},
+#: Types whose text sits somewhere other than the middle of the box, from
+#: `TYPE_STYLE` in `model.ts`.
+TYPE_TEXT_STYLE: dict[str, dict[str, Any]] = {
+    "container": {"vAlign": "top"},
+    # Paper, not a box: a sticky is written on from the corner you start
+    # writing in, so its label begins at the top left.
+    "sticky": {"hAlign": "left", "vAlign": "top"},
+    "text": {"hAlign": "left"},
+    # An icon and a picture are captioned underneath.
+    "image": {"vAlign": "below"},
+    "icon": {"vAlign": "below"},
 }
 
+#: The size each type is drawn at when the file does not say, from
+#: `DEFAULT_SIZE` in `model.ts`.
 DEFAULT_SIZE: dict[str, tuple[float, float]] = {
     "square": (120, 120),
     "ellipse": (140, 100),
     "diamond": (140, 100),
     "container": (320, 240),
+    "sticky": (140, 140),
     "text": (160, 32),
     "image": (160, 120),
     "icon": (64, 64),
@@ -97,49 +112,102 @@ def nanoid(size: int = 12, rng: random.Random | None = None) -> str:
     return "".join(r.choice(_ALPHABET) for _ in range(size))
 
 
-def style_for(node_type: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
-    """A complete style object: defaults, then per-type, then the overrides."""
-    style = dict(DEFAULT_STYLE)
-    style.update(TYPE_STYLE.get(node_type, {}))
-    style.update(overrides or {})
+# --- reading a node that only says what it changed ---------------------------
+#
+# Everything below answers a question about a node the way DeepDraw will answer
+# it when it reads the file: what type is this, whose drawing is it in, how big
+# is it, where does its text sit. A node that says nothing gets the same answer
+# the reader would give it, which is what lets the checks run over a file that
+# is mostly absences.
+
+
+def kind_of(node: dict[str, Any]) -> str:
+    """`link` or `shape`; a `targetId` makes a node a link on its own."""
+    return "link" if node.get("kind") == "link" or "targetId" in node else "shape"
+
+
+def type_of(node: dict[str, Any], root_id: str | None = None) -> str:
+    """The type a node is drawn as. A link is drawn as its target, but for size
+    and text placement the reader treats it as a rect, so that is what it is."""
+    if root_id is not None and node.get("id") == root_id:
+        return "root"
+    if kind_of(node) == "link":
+        return "rect"
+    return node.get("type") or "rect"
+
+
+def parent_of(doc: dict[str, Any], node: dict[str, Any]) -> str | None:
+    """Which drawing a node is in: what it says, the top level when it says
+    nothing or names a node that is not here, and nothing at all for the root."""
+    if node.get("id") == doc["rootId"]:
+        return None
+    parent = node.get("parentId")
+    return parent if parent in doc["nodes"] else doc["rootId"]
+
+
+def endpoint_of(node: dict[str, Any], which: str) -> dict[str, Any] | None:
+    """An arrow end as an object. `"from": "api"` is the hand-written spelling
+    of `{"nodeId": "api"}`, and the reader understands it, so this does too."""
+    end = node.get(which)
+    if isinstance(end, str):
+        return {"nodeId": end}
+    return end if isinstance(end, dict) else None
+
+
+def _own_style(node: dict[str, Any]) -> dict[str, Any]:
+    style = node.get("style")
+    return style if isinstance(style, dict) else {}
+
+
+def size_of(node: dict[str, Any], root_id: str | None = None) -> tuple[float, float]:
+    """Width and height as drawn: what the node says, else its type's own size."""
+    default_w, default_h = DEFAULT_SIZE.get(type_of(node, root_id), FALLBACK_SIZE)
+    w = node.get("w")
+    h = node.get("h")
+    return (float(default_w if w is None else w), float(default_h if h is None else h))
+
+
+def box_of(node: dict[str, Any], root_id: str | None = None) -> dict[str, float]:
+    """A node's rectangle, with everything it left out filled in as drawn."""
+    w, h = size_of(node, root_id)
+    return {"x": float(node.get("x") or 0), "y": float(node.get("y") or 0), "w": w, "h": h}
+
+
+def text_style(doc: dict[str, Any], node: dict[str, Any]) -> dict[str, Any]:
+    """Font size and alignment as drawn: the type's, then what the node names.
+
+    A link shows its target's shape, so it starts from the target's style and
+    layers its own overrides on top, the way `effectiveStyle` does in the app.
+    """
+    layers = [_own_style(node)]
+    seen = {node.get("id")}
+    current = node
+    while kind_of(current) == "link":
+        current = doc["nodes"].get(current.get("targetId")) or {}
+        if current.get("id") in seen:
+            break  # a link cycle; `validate` has more to say about it than this
+        seen.add(current.get("id"))
+        layers.append(_own_style(current))
+
+    style = {**DEFAULT_TEXT_STYLE, **TYPE_TEXT_STYLE.get(type_of(current, doc["rootId"]), {})}
+    for layer in reversed(layers):
+        style.update({k: v for k, v in layer.items() if k in DEFAULT_TEXT_STYLE})
     return style
 
 
-# --- document -> a smaller file ----------------------------------------------
+# --- numbers a person has to read --------------------------------------------
 
 
-def compact(doc: dict[str, Any]) -> dict[str, Any]:
-    """The same document with everything DeepDraw already assumes left out.
+def whole_numbers(doc: dict[str, Any]) -> dict[str, Any]:
+    """The same document with `760.0` written as `760`.
 
-    DeepDraw's reader fills defaults in on the way back (``normalizeDocument``
-    in the library, ``DocumentDefaults`` on the server, and the boot script of
-    the standalone page), so a file does not have to spell out eleven style
-    properties per shape that are already the type's own. It is the same
-    document, written the way a person would write it: what changed, and
-    nothing else.
-
-    Only what the reader is guaranteed to reconstruct is dropped:
-
-    - ``kind`` when it is ``shape``, ``type`` when it is ``rect``.
-    - ``x``/``y`` at 0, ``rotation`` at 0, ``text``/``markdown`` empty.
-    - ``w``/``h`` when they equal the type's default size.
-    - Style properties equal to the type's default, and ``style`` itself when
-      that leaves it empty.
-    - ``parentId`` when it is the root, since a parentless node is top level.
-
-    ``index`` and ``id`` stay. Order among siblings is what ``index`` carries,
-    and a reader falling back on declaration order would put it at the mercy of
-    how some JSON library happened to sort the keys.
+    The arithmetic here is in floats and the file is read by people; a
+    coordinate with a pointless `.0` on it is noise in a diff.
     """
-    nodes: dict[str, Any] = {}
-    for node_id, node in doc["nodes"].items():
-        nodes[node_id] = _whole_numbers(_compact_node(node, doc["rootId"]))
-    return {**doc, "nodes": nodes}
+    return {**doc, "nodes": {k: _whole_numbers(v) for k, v in doc["nodes"].items()}}
 
 
 def _whole_numbers(value: Any) -> Any:
-    """`760.0` written as `760`. The arithmetic here is in floats; the file is
-    read by people, and a coordinate with a pointless `.0` on it is noise."""
     if isinstance(value, bool):
         return value
     if isinstance(value, float) and value.is_integer():
@@ -151,64 +219,30 @@ def _whole_numbers(value: Any) -> Any:
     return value
 
 
-def _compact_node(node: dict[str, Any], root_id: str) -> dict[str, Any]:
-    out = {k: v for k, v in node.items() if k not in ("style", "kind")}
-    if node.get("kind") == "link":
-        out["kind"] = "link"
-        style = {k: v for k, v in (node.get("style") or {}).items()}
-        if style:
-            out["style"] = style
-        return out
-
-    node_type = node.get("type", "rect")
-    default_w, default_h = DEFAULT_SIZE.get(node_type, FALLBACK_SIZE)
-    defaults = {
-        "type": "rect",
-        "x": 0,
-        "y": 0,
-        "w": default_w,
-        "h": default_h,
-        "rotation": 0,
-        "text": "",
-        "markdown": "",
-        "groupId": None,
-        "parentId": root_id,
-    }
-    for field, default in defaults.items():
-        if field in out and out[field] == default:
-            del out[field]
-
-    reference = style_for(node_type)
-    style = {k: v for k, v in (node.get("style") or {}).items() if reference.get(k) != v}
-    if style:
-        out["style"] = style
-    return out
-
-
 # --- spec -> document --------------------------------------------------------
 
 
 def build_document(spec: dict[str, Any], seed: int | None = None) -> dict[str, Any]:
-    """The canonical document for `spec`.
+    """The document for `spec`, validated and ready to write.
 
-    A spec that is already a canonical document (a `nodes` *mapping* plus a
-    `rootId`) is normalised in place instead: missing styles are filled in and
-    everything else is left alone, so a document exported from DeepDraw can be
+    A spec that is already a document (a `nodes` *mapping* plus a `rootId`) is
+    taken as it stands instead, so a drawing exported from DeepDraw can be
     edited and fed straight back in.
     """
     if isinstance(spec.get("nodes"), dict) and spec.get("rootId"):
-        return _normalise_document(spec)
+        return _adopt_document(spec)
     return _from_tree(spec, seed)
 
 
-def _normalise_document(doc: dict[str, Any]) -> dict[str, Any]:
-    """A whole document out of one that may be missing most of itself.
+def _adopt_document(doc: dict[str, Any]) -> dict[str, Any]:
+    """A document taken as it stands: nothing filled in, only what is missing
+    from the *file* as a file.
 
-    This is the reading half of :func:`compact`, and it mirrors
-    ``normalizeDocument`` in DeepDraw's own library: what a file leaves out, the
-    reader puts back. So an exported drawing, a compacted one, and a document
-    somebody hand-edited down to the parts they cared about all arrive here as
-    the same thing.
+    A node's id is its key, so a hand-written document does not have to say it
+    twice; the checks below address nodes by id, so it is copied in. A drawing
+    with no root node still describes a drawing, so it is given one, the way
+    every reader does. Sizes, styles and alignments are left exactly as written,
+    absences included: `size_of`, `text_style` and the rest answer for those.
     """
     root_id = doc["rootId"]
     out = {
@@ -218,46 +252,16 @@ def _normalise_document(doc: dict[str, Any]) -> dict[str, Any]:
         "rootId": root_id,
         "nodes": {},
     }
-    for ordinal, (node_id, node) in enumerate(doc["nodes"].items()):
+    for node_id, node in doc["nodes"].items():
         node = dict(node)
         node["id"] = node_id
-        is_link = node.get("kind") == "link" or "targetId" in node
-        node_type = "root" if node_id == root_id else node.get("type", "rect")
-        if is_link:
-            node["kind"] = "link"
-        else:
-            node["kind"] = "shape"
-            node["type"] = node_type
-            node.setdefault("text", "")
-            node.setdefault("markdown", "")
-            node["style"] = style_for(node_type, node.get("style"))
-            # A bare node name is what somebody writing an arrow by hand means.
-            if node_type == "arrow":
-                for which in ("from", "to"):
-                    if isinstance(node.get(which), str):
-                        node[which] = {"nodeId": node[which]}
-
-        default_w, default_h = DEFAULT_SIZE.get("rect" if is_link else node_type, FALLBACK_SIZE)
-        for field, default in (
-            ("x", 0), ("y", 0), ("w", default_w), ("h", default_h),
-            ("rotation", 0), ("index", ordinal),
-        ):
-            node.setdefault(field, default)
-        # A missing parent, or one naming nothing, is the top level.
-        if node_id == root_id:
-            node["parentId"] = None
-        elif node.get("parentId") not in doc["nodes"]:
-            node["parentId"] = root_id
         out["nodes"][node_id] = node
 
     out["nodes"].setdefault(root_id, {
-        "kind": "shape", "id": root_id, "parentId": None, "index": 0,
-        "x": 0, "y": 0, "w": 0, "h": 0, "rotation": 0,
-        "type": "root", "text": "", "markdown": "", "style": style_for("root"),
+        "id": root_id, "parentId": None, "index": 0, "type": "root", "w": 0, "h": 0,
     })
-    _resolve_arrow_bounds(out)
     validate(out)
-    return out
+    return whole_numbers(out)
 
 
 def _from_tree(spec: dict[str, Any], seed: int | None) -> dict[str, Any]:
@@ -266,20 +270,18 @@ def _from_tree(spec: dict[str, Any], seed: int | None) -> dict[str, Any]:
     root_id = spec.get("rootId") or "root"
 
     nodes: dict[str, Any] = {
+        # The root's zero size is its own, not a default: the drawing is framed
+        # by what it holds, and a root the size of a rect would frame it wrong.
         root_id: {
-            "kind": "shape",
             "id": root_id,
             "parentId": None,
             "index": 0,
-            "x": 0, "y": 0, "w": 0, "h": 0,
-            "rotation": 0,
+            "w": 0, "h": 0,
             "type": "root",
-            "text": "",
             # The drawing's own notes. They are what a reader sees the moment
             # the file opens, before anything is selected, so a drawing without
             # them starts on an empty panel and an unexplained picture.
             "markdown": spec.get("notes") or spec.get("markdown") or "",
-            "style": style_for("root"),
         }
     }
 
@@ -290,7 +292,7 @@ def _from_tree(spec: dict[str, Any], seed: int | None) -> dict[str, Any]:
         raise SpecError("`shapes` must be a list of nodes")
 
     used: set[str] = {root_id}
-    _add_children(children, root_id, nodes, used, rng)
+    _add_children(children, root_id, root_id, nodes, used, rng)
 
     doc = {
         "version": DOC_VERSION,
@@ -299,14 +301,14 @@ def _from_tree(spec: dict[str, Any], seed: int | None) -> dict[str, Any]:
         "rootId": root_id,
         "nodes": nodes,
     }
-    _resolve_arrow_bounds(doc)
     validate(doc)
-    return doc
+    return whole_numbers(doc)
 
 
 def _add_children(
     items: list[dict[str, Any]],
     parent_id: str,
+    root_id: str,
     nodes: dict[str, Any],
     used: set[str],
     rng: random.Random | None,
@@ -319,24 +321,39 @@ def _add_children(
             raise SpecError(f"duplicate node id {node_id!r}")
         used.add(node_id)
 
-        node = _node_from_item(item, node_id, parent_id, index)
+        node = _node_from_item(item, node_id, parent_id, root_id, index)
         nodes[node_id] = node
 
         nested = item.get("children") or []
         if nested:
             if not isinstance(nested, list):
                 raise SpecError(f"`children` of {node_id!r} must be a list")
-            _add_children(nested, node_id, nodes, used, rng)
+            _add_children(nested, node_id, root_id, nodes, used, rng)
 
 
 def _node_from_item(
-    item: dict[str, Any], node_id: str, parent_id: str, index: int
+    item: dict[str, Any], node_id: str, parent_id: str, root_id: str, index: int
 ) -> dict[str, Any]:
-    geometry = {
-        "x": float(item.get("x", 0)),
-        "y": float(item.get("y", 0)),
-        "rotation": float(item.get("rotation", 0)),
-    }
+    """One node, carrying what the author wrote and nothing else.
+
+    No size, no style, no alignment is filled in here. DeepDraw fills its own
+    defaults in wherever the file is read, so a node saying only `type` is a
+    whole node, and one that says more says it because the author meant it.
+
+    What is added is what the file cannot work out for itself: the node's id,
+    which drawing it is in, and its place among its siblings. Even the parent is
+    left out at the top level, where an absent one already means exactly that.
+    """
+    node: dict[str, Any] = {"id": node_id, "index": int(item.get("index", index))}
+    if parent_id != root_id:
+        node["parentId"] = parent_id
+    for field in ("x", "y", "w", "h", "rotation"):
+        if item.get(field) is not None:
+            node[field] = float(item[field])
+    if item.get("style"):
+        node["style"] = dict(item["style"])
+    if item.get("groupId"):
+        node["groupId"] = item["groupId"]
 
     # A link borrows its target's content; only geometry and overrides are its own.
     if "link" in item:
@@ -350,42 +367,22 @@ def _node_from_item(
                 f"cannot have: it shows its target's notes and its target's nested "
                 f"drawing. A link takes x, y, w, h, text and style, and nothing else"
             )
-        node = {
-            "kind": "link",
-            "id": node_id,
-            "parentId": parent_id,
-            "index": int(item.get("index", index)),
-            "targetId": item["link"],
-            "w": float(item.get("w", FALLBACK_SIZE[0])),
-            "h": float(item.get("h", FALLBACK_SIZE[1])),
-            **geometry,
-        }
-        if "text" in item:
+        node["kind"] = "link"
+        node["targetId"] = item["link"]
+        if item.get("text"):
             node["text"] = item["text"]
-        if item.get("style"):
-            node["style"] = dict(item["style"])
-        if item.get("groupId"):
-            node["groupId"] = item["groupId"]
         return node
 
     node_type = item.get("type", "rect")
     if node_type not in SHAPE_TYPES:
         raise SpecError(f"node {node_id!r} has unknown type {node_type!r}")
-
-    default_w, default_h = DEFAULT_SIZE.get(node_type, FALLBACK_SIZE)
-    node = {
-        "kind": "shape",
-        "id": node_id,
-        "parentId": parent_id,
-        "index": int(item.get("index", index)),
-        "w": float(item.get("w", default_w)),
-        "h": float(item.get("h", default_h)),
-        "type": node_type,
-        "text": item.get("text", ""),
-        "markdown": item.get("markdown", item.get("notes", "")),
-        "style": style_for(node_type, item.get("style")),
-        **geometry,
-    }
+    if node_type != "rect":
+        node["type"] = node_type
+    if item.get("text"):
+        node["text"] = item["text"]
+    markdown = item.get("markdown") or item.get("notes")
+    if markdown:
+        node["markdown"] = markdown
 
     if node_type == "arrow":
         node["from"] = _endpoint(item.get("from"), node_id, "from")
@@ -399,8 +396,6 @@ def _node_from_item(
         node["href"] = item["href"]
     if item.get("points"):
         node["points"] = [float(p) for p in item["points"]]
-    if item.get("groupId"):
-        node["groupId"] = item["groupId"]
     return node
 
 
@@ -461,19 +456,24 @@ def arrow_points(doc: dict[str, Any], node: dict[str, Any]):
     boxes meets their borders rather than their centres.
     """
     nodes = doc["nodes"]
-    src = nodes.get((node.get("from") or {}).get("nodeId"))
-    dst = nodes.get((node.get("to") or {}).get("nodeId"))
+    root_id = doc["rootId"]
+    start = endpoint_of(node, "from")
+    end_ = endpoint_of(node, "to")
+    src = nodes.get((start or {}).get("nodeId"))
+    dst = nodes.get((end_ or {}).get("nodeId"))
+    own = box_of(node, root_id)
 
     def centre(n):
-        return n["x"] + n["w"] / 2, n["y"] + n["h"] / 2
+        rect = box_of(n, root_id)
+        return rect["x"] + rect["w"] / 2, rect["y"] + rect["h"] / 2
 
     from_hint = centre(dst) if dst else (
-        (node.get("to") or {}).get("x", node["x"] + node["w"]),
-        (node.get("to") or {}).get("y", node["y"] + node["h"]),
+        (end_ or {}).get("x", own["x"] + own["w"]),
+        (end_ or {}).get("y", own["y"] + own["h"]),
     )
     to_hint = centre(src) if src else (
-        (node.get("from") or {}).get("x", node["x"]),
-        (node.get("from") or {}).get("y", node["y"]),
+        (start or {}).get("x", own["x"]),
+        (start or {}).get("y", own["y"]),
     )
 
     def anchor(end, toward):
@@ -482,28 +482,31 @@ def arrow_points(doc: dict[str, Any], node: dict[str, Any]):
         target = nodes.get(end.get("nodeId"))
         if not target:
             return end.get("x", toward[0]), end.get("y", toward[1])
-        rect = {"x": target["x"], "y": target["y"], "w": target["w"], "h": target["h"]}
+        rect = box_of(target, root_id)
         if end.get("side"):
             return _side_point(rect, end["side"])
         return _border_point_toward(rect, toward)
 
-    return anchor(node.get("from"), from_hint), anchor(node.get("to"), to_hint)
+    return anchor(start, from_hint), anchor(end_, to_hint)
 
 
-def _resolve_arrow_bounds(doc: dict[str, Any]) -> None:
-    """Stores each arrow's drawn bounding box, as the app does on every edit."""
-    for node in doc["nodes"].values():
-        if node.get("kind") == "shape" and node.get("type") == "arrow":
-            (ax, ay), (bx, by) = arrow_points(doc, node)
-            node["x"] = min(ax, bx)
-            node["y"] = min(ay, by)
-            node["w"] = abs(ax - bx)
-            node["h"] = abs(ay - by)
+def rect_of(doc: dict[str, Any], node: dict[str, Any]) -> dict[str, float]:
+    """The rectangle a node is drawn in.
+
+    An arrow's is the box its line spans, worked out from the endpoints every
+    time rather than stored on the node: that is what the renderer does with it
+    (`boundsOf` in `shapes.ts`), so an arrow in a file never has to carry a box
+    of its own, and one that carries a stale box is not believed.
+    """
+    if kind_of(node) == "shape" and type_of(node, doc["rootId"]) == "arrow":
+        (ax, ay), (bx, by) = arrow_points(doc, node)
+        return {"x": min(ax, bx), "y": min(ay, by), "w": abs(ax - bx), "h": abs(ay - by)}
+    return box_of(node, doc["rootId"])
 
 
 def canvas_bounds(doc: dict[str, Any], drawing_id: str) -> dict[str, float]:
     """The paper one drawing opens on: its contents, never smaller than MIN_CANVAS."""
-    children = [n for n in doc["nodes"].values() if n.get("parentId") == drawing_id]
+    children = [rect_of(doc, n) for n in doc["nodes"].values() if parent_of(doc, n) == drawing_id]
     if not children:
         return {"x": 0.0, "y": 0.0, "w": float(MIN_CANVAS), "h": float(MIN_CANVAS)}
     xs0 = min(n["x"] for n in children)
@@ -545,7 +548,7 @@ def _mention_warnings(doc: dict[str, Any]) -> list[str]:
         if node_id == root_id:
             continue
         text = node.get("text")
-        if text is None and node.get("kind") == "link":
+        if text is None and kind_of(node) == "link":
             target = nodes.get(node.get("targetId")) or {}
             text = target.get("text")
         if text and text.strip():
@@ -592,10 +595,10 @@ MAX_CROWDING_WARNINGS = 40
 #: Types with a body drawn on the paper, which a label or a line can be lost
 #: against. A `container` is meant to enclose things and a `draw` is meant to be
 #: scribbled over them, so neither counts as being in the way.
-SOLID_TYPES = {"rect", "square", "ellipse", "diamond", "fatArrow", "image", "icon"}
+SOLID_TYPES = {"rect", "square", "ellipse", "diamond", "fatArrow", "sticky", "image", "icon"}
 
 
-def label_box(node: dict[str, Any]) -> dict[str, float] | None:
+def label_box(doc: dict[str, Any], node: dict[str, Any]) -> dict[str, float] | None:
     """Where a node's label actually lands, the way `wn()` in the viewer puts it.
 
     Labels never wrap, so the width comes from the longest line and not from
@@ -605,31 +608,31 @@ def label_box(node: dict[str, Any]) -> dict[str, float] | None:
     text = (node.get("text") or "").strip()
     if not text:
         return None
-    style = node.get("style") or {}
-    size = float(style.get("fontSize", DEFAULT_STYLE["fontSize"]))
+    style = text_style(doc, node)
+    rect = rect_of(doc, node)
+    size = float(style["fontSize"])
     lines = text.split("\n")
     w = max(len(line) for line in lines) * size * CHAR_WIDTH
     h = len(lines) * size * LINE_HEIGHT
 
-    h_align = style.get("hAlign", "center")
-    if h_align == "left":
-        x = node["x"] + TEXT_PAD
-    elif h_align == "right":
-        x = node["x"] + node["w"] - TEXT_PAD - w
+    if style["hAlign"] == "left":
+        x = rect["x"] + TEXT_PAD
+    elif style["hAlign"] == "right":
+        x = rect["x"] + rect["w"] - TEXT_PAD - w
     else:
-        x = node["x"] + (node["w"] - w) / 2
+        x = rect["x"] + (rect["w"] - w) / 2
 
-    v_align = style.get("vAlign", "middle")
+    v_align = style["vAlign"]
     if v_align == "above":
-        y = node["y"] - h - TEXT_PAD
+        y = rect["y"] - h - TEXT_PAD
     elif v_align == "top":
-        y = node["y"] + TEXT_PAD
+        y = rect["y"] + TEXT_PAD
     elif v_align == "bottom":
-        y = node["y"] + node["h"] - h - TEXT_PAD
+        y = rect["y"] + rect["h"] - h - TEXT_PAD
     elif v_align == "below":
-        y = node["y"] + node["h"] + TEXT_PAD
+        y = rect["y"] + rect["h"] + TEXT_PAD
     else:
-        y = node["y"] + (node["h"] - h) / 2
+        y = rect["y"] + (rect["h"] - h) / 2
     return {"x": x, "y": y, "w": w, "h": h}
 
 
@@ -708,17 +711,23 @@ def drawing_extents(doc: dict[str, Any]) -> dict[str, tuple[float, float]]:
     you click into. Unlike `canvas_bounds` this does not clamp to MIN_CANVAS,
     because what matters here is how big the drawing is against its siblings."""
     extents: dict[str, tuple[float, float]] = {}
-    children: dict[str, list[dict[str, Any]]] = {}
-    for node in doc["nodes"].values():
-        parent = node.get("parentId")
-        if parent is not None:
-            children.setdefault(parent, []).append(node)
-    for parent, kids in children.items():
+    for parent, kids in _by_drawing(doc).items():
+        rects = [rect_of(doc, n) for n in kids]
         extents[parent] = (
-            max(n["x"] + n["w"] for n in kids) - min(n["x"] for n in kids),
-            max(n["y"] + n["h"] for n in kids) - min(n["y"] for n in kids),
+            max(r["x"] + r["w"] for r in rects) - min(r["x"] for r in rects),
+            max(r["y"] + r["h"] for r in rects) - min(r["y"] for r in rects),
         )
     return extents
+
+
+def _by_drawing(doc: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """The nodes of each drawing, keyed by the node you click into."""
+    drawings: dict[str, list[dict[str, Any]]] = {}
+    for node in doc["nodes"].values():
+        parent = parent_of(doc, node)
+        if parent is not None:
+            drawings.setdefault(parent, []).append(node)
+    return drawings
 
 
 #: The drawing pane, in CSS pixels, on a laptop-sized window. The hierarchy
@@ -740,12 +749,7 @@ def _readability_warnings(doc: dict[str, Any]) -> list[str]:
     perfectly and says nothing about it.
     """
     extents = drawing_extents(doc)
-    nodes = doc["nodes"]
-    children: dict[str, list[dict[str, Any]]] = {}
-    for node in nodes.values():
-        parent = node.get("parentId")
-        if parent is not None:
-            children.setdefault(parent, []).append(node)
+    children = _by_drawing(doc)
 
     warnings: list[str] = []
     for drawing_id, (w, h) in sorted(extents.items()):
@@ -755,7 +759,7 @@ def _readability_warnings(doc: dict[str, Any]) -> list[str]:
         if scale >= 1:
             continue
         sizes = [
-            float((n.get("style") or {}).get("fontSize", DEFAULT_STYLE["fontSize"]))
+            float(text_style(doc, n)["fontSize"])
             for n in children.get(drawing_id, [])
             if (n.get("text") or "").strip()
         ]
@@ -814,21 +818,16 @@ def _crowding_warnings(doc: dict[str, Any]) -> list[str]:
     out is to open the drawing and look. So look here instead, one drawing at a
     time, since coordinates only mean anything within one.
     """
-    nodes = doc["nodes"]
-    drawings: dict[str, list[dict[str, Any]]] = {}
-    for node in nodes.values():
-        parent = node.get("parentId")
-        if parent is not None:
-            drawings.setdefault(parent, []).append(node)
-
+    root_id = doc["rootId"]
     warnings: list[str] = []
-    for siblings in drawings.values():
+    for siblings in _by_drawing(doc).values():
         siblings = sorted(siblings, key=lambda n: n["id"])
+        rects = {n["id"]: rect_of(doc, n) for n in siblings}
         solids = [
             n for n in siblings
-            if n.get("kind") == "link" or n.get("type") in SOLID_TYPES
+            if kind_of(n) == "link" or type_of(n, root_id) in SOLID_TYPES
         ]
-        labels = [(n, label_box(n)) for n in siblings if n.get("type") != "container"]
+        labels = [(n, label_box(doc, n)) for n in siblings if type_of(n, root_id) != "container"]
         labels = [(n, box) for n, box in labels if box]
         solid_ids = {n["id"] for n in solids}
 
@@ -836,10 +835,10 @@ def _crowding_warnings(doc: dict[str, Any]) -> list[str]:
             over = [
                 other["id"] for other in solids
                 if other["id"] != node["id"]
-                and all(d > CROWDING_SLACK for d in _overlap(box, other))
+                and all(d > CROWDING_SLACK for d in _overlap(box, rects[other["id"]]))
             ]
             if over:
-                what = "label" if node.get("type") == "arrow" else "text"
+                what = "label" if type_of(node, root_id) == "arrow" else "text"
                 warnings.append(
                     f"{node['id']!r}: its {what} {_short(node)} is drawn across "
                     f"{_join(over)}; widen the gap, shorten it, or move it"
@@ -850,7 +849,7 @@ def _crowding_warnings(doc: dict[str, Any]) -> list[str]:
         # A label that stays inside a shape is that shape, and was checked above.
         stray = [
             (n, box) for n, box in labels
-            if n["id"] not in solid_ids or not _contains(n, box)
+            if n["id"] not in solid_ids or not _contains(rects[n["id"]], box)
         ]
         for i, (node, box) in enumerate(stray):
             for other, other_box in stray[i + 1:]:
@@ -861,14 +860,14 @@ def _crowding_warnings(doc: dict[str, Any]) -> list[str]:
                     )
 
         for node in siblings:
-            if node.get("kind") != "shape" or node.get("type") != "arrow":
+            if kind_of(node) != "shape" or type_of(node, root_id) != "arrow":
                 continue
-            ends = {(node.get(w) or {}).get("nodeId") for w in ("from", "to")}
+            ends = {(endpoint_of(node, w) or {}).get("nodeId") for w in ("from", "to")}
             p1, p2 = arrow_points(doc, node)
             for other in solids:
                 if other["id"] in ends:
                     continue
-                if _crosses(p1, p2, other):
+                if _crosses(p1, p2, rects[other["id"]]):
                     warnings.append(
                         f"{node['id']!r}: the line runs through {other['id']!r}, which is "
                         f"neither end of it; an arrow is a straight line, so move a box "
@@ -877,7 +876,7 @@ def _crowding_warnings(doc: dict[str, Any]) -> list[str]:
 
         for i, node in enumerate(solids):
             for other in solids[i + 1:]:
-                dx, dy = _overlap(node, other)
+                dx, dy = _overlap(rects[node["id"]], rects[other["id"]])
                 if dx > CROWDING_SLACK and dy > CROWDING_SLACK:
                     warnings.append(
                         f"{node['id']!r} and {other['id']!r} overlap by "
@@ -909,43 +908,52 @@ def validate(doc: dict[str, Any]) -> list[str]:
     for node_id, node in nodes.items():
         if node.get("id") != node_id:
             problems.append(f"{node_id!r}: `id` does not match its key")
-        kind = node.get("kind")
-        if kind not in ("shape", "link"):
+        if node.get("kind") not in (None, "shape", "link"):
             problems.append(f"{node_id!r}: kind must be 'shape' or 'link'")
             continue
+        kind = kind_of(node)
 
-        parent = node.get("parentId")
+        # A parent naming nothing is not an error: every reader takes it for the
+        # top level. It is rarely what somebody meant by it, though.
         if node_id == root_id:
-            if parent is not None:
+            if node.get("parentId") is not None:
                 problems.append("the root node must have parentId null")
-        elif parent not in nodes:
-            problems.append(f"{node_id!r}: parentId {parent!r} is not a node")
+        elif node.get("parentId") is not None and node["parentId"] not in nodes:
+            warnings.append(
+                f"{node_id!r}: parentId {node['parentId']!r} is not a node, so this "
+                f"is read as being on the top level"
+            )
+        parent = parent_of(doc, node)
 
         if kind == "link":
             if node.get("targetId") not in nodes:
                 problems.append(f"{node_id!r}: link target {node.get('targetId')!r} is not a node")
             continue
 
-        node_type = node.get("type")
-        if node_type not in SHAPE_TYPES:
-            problems.append(f"{node_id!r}: unknown type {node_type!r}")
+        node_type = type_of(node, root_id)
+        if node.get("type") is not None and node["type"] not in SHAPE_TYPES:
+            problems.append(f"{node_id!r}: unknown type {node['type']!r}")
+
+        # A style says what it changes and nothing else, so there is nothing to
+        # be missing. What can go wrong is a value the renderer will not take,
+        # and a property name it does not know, which it drops without a word.
         style = node.get("style")
-        if not isinstance(style, dict):
-            problems.append(f"{node_id!r}: `style` is required on every shape node")
-        else:
-            missing = sorted(set(DEFAULT_STYLE) - set(style))
-            if missing:
-                problems.append(f"{node_id!r}: style is missing {', '.join(missing)}")
-            if style.get("strokeStyle") not in STROKE_STYLES:
-                problems.append(f"{node_id!r}: strokeStyle must be one of {sorted(STROKE_STYLES)}")
-            if style.get("hAlign") not in H_ALIGNS:
-                problems.append(f"{node_id!r}: hAlign must be one of {sorted(H_ALIGNS)}")
-            if style.get("vAlign") not in V_ALIGNS:
-                problems.append(f"{node_id!r}: vAlign must be one of {sorted(V_ALIGNS)}")
+        if style is not None and not isinstance(style, dict):
+            problems.append(f"{node_id!r}: `style` must be an object")
+        elif isinstance(style, dict):
+            for key in sorted(set(style) - STYLE_KEYS):
+                warnings.append(
+                    f"{node_id!r}: style has no property {key!r}, so it is ignored"
+                )
+            for key, allowed in (
+                ("strokeStyle", STROKE_STYLES), ("hAlign", H_ALIGNS), ("vAlign", V_ALIGNS),
+            ):
+                if key in style and style[key] not in allowed:
+                    problems.append(f"{node_id!r}: {key} must be one of {sorted(allowed)}")
 
         if node_type == "arrow":
             for which in ("from", "to"):
-                end = node.get(which)
+                end = endpoint_of(node, which)
                 if not isinstance(end, dict):
                     problems.append(f"{node_id!r}: arrow needs a `{which}` endpoint")
                     continue
@@ -957,7 +965,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
                         problems.append(f"{node_id!r}: a free `{which}` needs both x and y")
                 elif target_id not in nodes:
                     problems.append(f"{node_id!r}: `{which}` points at unknown node {target_id!r}")
-                elif nodes[target_id].get("parentId") != parent:
+                elif parent_of(doc, nodes[target_id]) != parent:
                     # Coordinates only mean something within one drawing, so an
                     # arrow reaching into another one lands somewhere arbitrary.
                     warnings.append(
@@ -994,7 +1002,7 @@ def validate(doc: dict[str, Any]) -> list[str]:
         cur = node_id
         while cur is not None and cur not in seen:
             seen.add(cur)
-            cur = nodes[cur].get("parentId") if cur in nodes else None
+            cur = parent_of(doc, nodes[cur]) if cur in nodes else None
         if cur is not None:
             problems.append(f"{node_id!r}: parentId chain is a cycle")
             break

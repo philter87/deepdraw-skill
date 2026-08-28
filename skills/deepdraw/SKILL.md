@@ -72,7 +72,8 @@ of the work:
   machine-drawn picture, which is exactly what it is. Do not draw shapes the
   other types give you for free.
 - **Vary the shapes.** `diamond` for a decision, `ellipse` for a store,
-  `container` for a boundary, `fatArrow` for a flow, `text` for a caption. A
+  `container` for a boundary, `fatArrow` for a flow, `sticky` for a note stuck
+  on the drawing (an open question, a caveat, a to-do), `text` for a caption. A
   page of identical rectangles is a page nobody scans.
 
 ## Rules that are easy to get wrong

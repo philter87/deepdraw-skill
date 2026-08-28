@@ -73,7 +73,9 @@ there. Two things follow:
 
 `vAlign: "above"` and `"below"` draw the label *outside* the shape, which is
 how `icon` and `image` are captioned by default. `container` puts its label at
-the top, out of the way of what is inside it.
+the top, out of the way of what is inside it, and `sticky` writes from the
+**top left**, the way somebody writes on a real note: a couple of short lines
+that start at the corner, not a centred caption.
 
 ## Leave room for the label
 

@@ -86,9 +86,10 @@ Two files beside each other:
 
 - `drawing.html`, the page. It needs no network and no server, and the whole
   drawing travels inside it.
-- `drawing.deepdraw.json`, the same drawing as JSON. It is written **compact**,
-  with every DeepDraw default left out, so it is about half the size of a full
-  export and small enough to read and edit by hand.
+- `drawing.deepdraw.json`, the same drawing as JSON. It carries **only what the
+  drawing set**, since DeepDraw fills its own defaults in wherever a document is
+  read, so it is about half the size of a full export and small enough to read
+  and edit by hand.
 
 Either one imports into deepdraw.ai through **☰ → Import…**, which is where you
 go to edit a drawing after the fact.

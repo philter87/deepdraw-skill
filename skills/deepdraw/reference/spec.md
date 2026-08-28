@@ -57,6 +57,7 @@ document (`document-format.md`).
 | `diamond` | 140×100 | Decisions |
 | `container` | 320×240 | Transparent, dashed, label at the top. Groups shapes *visually*; it does not own them |
 | `fatArrow` | 160×70 | A block arrow pointing right; rotate it to point elsewhere |
+| `sticky` | 140×140 | A yellow sticky note with a folded corner; its label is written from the **top left** |
 | `text` | 160×32 | The label alone: no fill, no stroke, left-aligned |
 | `icon` | 64×64 | Inline SVG in `href`, recoloured with `textColor`, label below |
 | `image` | 160×120 | A picture named by `href`, label below (see [Pictures](#pictures)) |
@@ -200,16 +201,19 @@ nothing.
 
 ## What the builder writes
 
-The document it emits is **compact**: every field DeepDraw can work out for
-itself is left out, so the `.deepdraw.json` beside the HTML is a file a person
-can read, and roughly half the size of a full export. Defaults are filled back
-in by whatever reads it, in all three places that read one: the library, the
-server behind deepdraw.ai's Import button, and the standalone page's own boot
-script. Feeding that compact JSON straight back into `build_html.py` reproduces
-the same drawing.
+**What you wrote, and nothing else.** The builder never fills a default in: no
+size, no style, no alignment, not even an arrow's bounding box, which the
+renderer works out from the endpoints every time. So the `.deepdraw.json` beside
+the HTML is a file a person can read, roughly half the size of a full export.
+
+Defaults are filled back in by whatever reads it, in all three places that read
+a document: the library (`normalizeDocument`), the server behind deepdraw.ai's
+Import button, and the standalone page's own boot script. Feeding that JSON
+straight back into `build_html.py` reproduces the same drawing.
 
 That is worth knowing when you hand-edit a document: **write what changed and
-nothing else**. A node needs a type at most.
+nothing else**. A node needs a type at most, and one that is already terse comes
+out of the builder exactly as terse as it went in.
 
 ## Building
 
@@ -220,9 +224,10 @@ python3 "$SKILL/scripts/build_html.py" spec.json --json        # also write the 
 python3 "$SKILL/scripts/build_html.py" spec.json --seed 7      # reproducible generated ids
 ```
 
-Errors stop the build (an arrow pointing at nothing, a missing style field, a
-`parentId` cycle, a `link` carrying notes of its own). Warnings do not (an arrow
-across drawings, an `icon` with no `href`, a label drawn across a box, a line
+Errors stop the build (an arrow pointing at nothing, an unknown type, a style
+value the renderer will not take, a `parentId` cycle, a `link` carrying notes of
+its own). Warnings do not (an arrow across drawings, an `icon` with no `href`, a
+style property DeepDraw does not have, a label drawn across a box, a line
 through a shape that is neither of its ends, two shapes on top of each other, a
 level laid out at a different scale from the rest, an em dash), but read them
 anyway: both mean the drawing will not look how you meant.

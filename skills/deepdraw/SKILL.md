@@ -38,8 +38,13 @@ conversation, and ask when it is not obvious.
 
    It validates first and refuses to write a drawing that would not render. Fix
    what it reports; never hand over a file you have not built.
-5. **Say what they have:** the `.html` to open or import, and the
-   `.deepdraw.json` beside it, which DeepDraw imports too.
+
+   The page it writes is **editable**: it opens in edit mode and its Save button
+   writes this same file back to disk, so the drawing is something the reader
+   can keep working on. Add `--view-only` only when they asked for a page that
+   must not be changed.
+5. **Say what they have:** the `.html` to open or import — editable, and it saves
+   itself back — and the `.deepdraw.json` beside it, which DeepDraw imports too.
 
 ## Make it worth looking at
 

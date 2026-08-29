@@ -11,6 +11,10 @@ browser and imports back into deepdraw.ai through Import → File.
 `--json` writes the canonical document beside it, which is the other format
 deepdraw.ai imports.
 
+The page opens **editable**: whoever has the file can move shapes, write notes
+and press Save to write the file back. `--view-only` builds the read-only page
+instead.
+
 An `image` node's `href` may be a `data:` URI, a path to a file beside the spec,
 or an http(s) address; the last two are read in and inlined here, so what is
 written stands on its own (`inline_images.py` says why that matters).
@@ -85,10 +89,23 @@ def fill(template: str, mark: str, value: str) -> str:
     return template.replace(mark, value)
 
 
-def to_standalone_html(document: dict) -> str:
+def to_standalone_html(document: dict, allow_edit: bool = True) -> str:
+    """The page for `document`. Editable unless told otherwise.
+
+    `allowEdit` sits *beside* the document rather than in it — it is about this
+    file, not about the drawing — and the page's bootstrap reads it to decide
+    whether it opens in edit mode with a Save button or as a read-only view.
+    A drawing is something to think with, so the default is the editable one:
+    whoever opens the page can move a box, write a note and save the file back.
+    A page built with `--view-only` is the exception, for handing a drawing to
+    someone who should read it and not change it.
+    """
+    payload = dict(document)
+    if allow_edit:
+        payload["allowEdit"] = True
     template = TEMPLATE.read_text(encoding="utf-8")
     html = fill(template, TITLE_MARK, escape_html(document.get("title") or "DeepDraw"))
-    html = fill(html, DOCUMENT_MARK, embed(document))
+    html = fill(html, DOCUMENT_MARK, embed(payload))
     return fill(html, CREDIT_MARK, CREDIT)
 
 
@@ -100,6 +117,8 @@ def main() -> int:
                         help="also write the canonical document JSON")
     parser.add_argument("--check", action="store_true",
                         help="validate and report only; write nothing")
+    parser.add_argument("--view-only", dest="view_only", action="store_true",
+                        help="build a read-only page (default: the page opens editable and can save itself back)")
     parser.add_argument("--seed", type=int, help="seed the generated ids, for reproducible output")
     args = parser.parse_args()
 
@@ -144,7 +163,7 @@ def main() -> int:
     # fills its own defaults in wherever the file is read, which is what makes
     # the JSON beside it something a person can read and edit.
     out = Path(args.out) if args.out else spec_path.with_suffix(".html")
-    out.write_text(to_standalone_html(document), encoding="utf-8")
+    out.write_text(to_standalone_html(document, allow_edit=not args.view_only), encoding="utf-8")
     print(f"wrote {out} ({out.stat().st_size // 1024} KB)")
 
     if args.json_out:

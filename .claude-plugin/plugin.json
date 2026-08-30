@@ -1,7 +1,7 @@
 {
   "name": "deepdraw",
   "description": "Draw for DeepDraw (deepdraw.ai): author a hierarchical diagram as JSON and build the interactive standalone HTML the app exports and imports.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "author": { "name": "philter87", "url": "https://github.com/philter87" },
   "homepage": "https://github.com/philter87/deepdraw-skill",
   "license": "MIT",

@@ -1,6 +1,6 @@
 ---
 name: deepdraw
-description: Draw a hierarchical diagram for DeepDraw (deepdraw.ai) and build it as an interactive, standalone HTML file.
+description: Draw a hierarchical diagram for DeepDraw (deepdraw.app) and build it as an interactive, standalone HTML file.
 disable-model-invocation: true
 ---
 
@@ -12,7 +12,7 @@ a DeepDraw drawing with the interesting half left out. Put the detail *inside*
 the boxes rather than spreading it across the page.
 
 You write a spec (JSON), run one script, and hand back a single `.html`: a page
-that opens in any browser and imports into deepdraw.ai through **☰ → Import…**.
+that opens in any browser and imports into deepdraw.app through **☰ → Import…**.
 
 Subject of the drawing: **$ARGUMENTS**. If that is empty, take it from the
 conversation, and ask when it is not obvious.
@@ -66,7 +66,7 @@ of the work:
   the whiteboard this drawing came from. The builder reads it in and inlines it,
   so the `.html` carries the picture itself; a link it cannot fetch stops the
   build rather than shipping a drawing with a hole in it. PNG, JPEG, GIF, WebP
-  and AVIF (an SVG belongs in an `icon` node). **Keep them small**: deepdraw.ai
+  and AVIF (an SVG belongs in an `icon` node). **Keep them small**: deepdraw.app
   gives an anonymous browser **5 MB** of image storage, 50 MB signed in, so a
   drawing heavier than that is one to import signed in. Details in
   `reference/spec.md` under Pictures.

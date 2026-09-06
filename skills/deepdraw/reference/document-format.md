@@ -58,7 +58,7 @@ like: a snapshot that left things out would be lying about them.
 
 **A file you write does not have to be.** Every reader fills the defaults back
 in before anything renders, in all three places that read a document: the
-library (`normalizeDocument`), the server behind deepdraw.ai's Import button,
+library (`normalizeDocument`), the server behind deepdraw.app's Import button,
 and the standalone page's own boot script. So the shape above is also legal as:
 
 ```jsonc

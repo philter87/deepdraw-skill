@@ -1,6 +1,6 @@
 # deepdraw-skill
 
-An agent skill for [**DeepDraw**](https://deepdraw.ai): interactive drawings
+An agent skill for [**DeepDraw**](https://deepdraw.app): interactive drawings
 with markdown.
 
 Great for software architecture and organizing knowledge visually. 
@@ -9,7 +9,7 @@ Great for software architecture and organizing knowledge visually.
 
 ## See one
 
-**[How the Web Evolved, 1989 to 2026](https://deepdraw.ai/docs/yvWsxwhm8PWM)**
+**[How the Web Evolved, 1989 to 2026](https://deepdraw.app/docs/yvWsxwhm8PWM)**
 
 That is the shape to aim for. A drawing worth keeping has:
 
@@ -91,7 +91,7 @@ Two files beside each other:
   read, so it is about half the size of a full export and small enough to read
   and edit by hand.
 
-Either one imports into deepdraw.ai through **☰ → Import…**, which is where you
+Either one imports into deepdraw.app through **☰ → Import…**, which is where you
 go to edit a drawing after the fact.
 
 ## Rebuilding the template

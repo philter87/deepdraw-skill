@@ -79,7 +79,7 @@ try {
   });
 
   check('the page is signed by both', () => {
-    if (!html.includes('deepdraw.ai')) throw new Error('the DeepDraw credit is missing');
+    if (!html.includes('deepdraw.app')) throw new Error('the DeepDraw credit is missing');
     if (!html.includes('deepdraw-skill')) throw new Error('the skill credit is missing');
   });
 

@@ -6,10 +6,10 @@
 The result is byte-for-byte the kind of file DeepDraw's "Export → HTML" button
 writes: the library inlined, and the document in a
 `<script id="dd-document" type="application/json">`. It opens on its own in a
-browser and imports back into deepdraw.ai through Import → File.
+browser and imports back into deepdraw.app through Import → File.
 
 `--json` writes the canonical document beside it, which is the other format
-deepdraw.ai imports.
+deepdraw.app imports.
 
 The page opens **editable**: whoever has the file can move shapes, write notes
 and press Save to write the file back. `--view-only` builds the read-only page

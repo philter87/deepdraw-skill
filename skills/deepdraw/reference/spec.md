@@ -147,7 +147,7 @@ same thing in the file that is written:
 
 **The builder reads the first two in and inlines them**, so the `.html` it
 writes carries the picture itself and needs nothing else to render. That is what
-makes it work when it is mailed on, when it is imported into deepdraw.ai (whose
+makes it work when it is mailed on, when it is imported into deepdraw.app (whose
 `img-src` refuses to load a picture from another origin), and when it is
 exported to PNG (where an SVG rasterized through an `<img>` loads no external
 references at all).
@@ -161,7 +161,7 @@ references at all).
   the shape's `textColor` says.
 - **Keep them small.** One picture over 2 MB is warned about, over 10 MB is
   refused, and the whole drawing passing 5 MB is warned about too. That last
-  number is the image storage deepdraw.ai gives an **anonymous** browser (50 MB
+  number is the image storage deepdraw.app gives an **anonymous** browser (50 MB
   signed in), so a picture-heavy drawing is one to import signed in.
 - **Size the node to the picture's aspect ratio.** The image is fitted inside
   `w`×`h` (`xMidYMid meet`), so a wrong ratio is empty space, not a stretch.
@@ -207,7 +207,7 @@ renderer works out from the endpoints every time. So the `.deepdraw.json` beside
 the HTML is a file a person can read, roughly half the size of a full export.
 
 Defaults are filled back in by whatever reads it, in all three places that read
-a document: the library (`normalizeDocument`), the server behind deepdraw.ai's
+a document: the library (`normalizeDocument`), the server behind deepdraw.app's
 Import button, and the standalone page's own boot script. Feeding that JSON
 straight back into `build_html.py` reproduces the same drawing.
 

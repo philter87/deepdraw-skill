@@ -11,7 +11,7 @@ This module rewrites the second and third into the first, so what
 `build_html.py` writes is one file that needs nothing else. That is not tidiness.
 A drawing that references a picture somewhere else loses it three separate ways:
 
-- **On deepdraw.ai.** The page's `img-src` is `'self' data: blob:`, so an
+- **On deepdraw.app.** The page's `img-src` is `'self' data: blob:`, so an
   address on somebody else's origin is refused by the browser and the shape
   draws as an empty frame. A file that looked right on a disk quietly loses its
   pictures the moment it is imported.
@@ -32,7 +32,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-#: Matches what deepdraw.ai's own upload endpoint accepts, so a drawing built
+#: Matches what deepdraw.app's own upload endpoint accepts, so a drawing built
 #: here holds nothing the app would have refused. SVG is absent from both for
 #: the same reason: an `icon` node takes inline `<svg>` markup and is the right
 #: home for a vector glyph.
@@ -49,7 +49,7 @@ MAGIC: list[tuple[str, object]] = [
 LARGE_IMAGE_BYTES = 2 * 1024 * 1024
 
 #: Refused. The standalone HTML carries the library already, and a document this
-#: big is one nobody can mail, and one deepdraw.ai will not take from an
+#: big is one nobody can mail, and one deepdraw.app will not take from an
 #: anonymous account (5 MB of image storage; 50 MB signed in).
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
@@ -120,10 +120,10 @@ def inline_images(document: dict, base_dir: Path) -> list[str]:
         node["href"] = resolved[href]
 
     # The whole point of the 5 MB line is that it is the anonymous ceiling on
-    # deepdraw.ai, which is where most of these drawings are opened.
+    # deepdraw.app, which is where most of these drawings are opened.
     if total > 5 * 1024 * 1024:
         warnings.append(
-            f"the drawing carries {_size(total)} of pictures. deepdraw.ai gives an "
+            f"the drawing carries {_size(total)} of pictures. deepdraw.app gives an "
             "anonymous browser 5 MB of image storage (50 MB signed in), so import "
             "this one signed in, or use fewer and smaller pictures."
         )
